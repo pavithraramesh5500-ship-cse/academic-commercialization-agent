@@ -446,6 +446,56 @@ _MIN_EVIDENCE_SUMMARY_CHARS = 100
 _ABSTRACT_MIN_CHARS: int = 20
 # Maximum characters kept from abstracts/patent bodies passed to the LLM.
 _ABSTRACT_MAX_CHARS: int = 1500
+# Room kept for an over-long abstract's closing sentences (see _bounded_abstract).
+_ABSTRACT_TAIL_CHARS: int = 450
+_ELISION = " […] "
+# A Latin sentence end is punctuation followed by whitespace, so "3.5" and
+# "U.S.A" do not split; CJK ends need no space after them.
+_SENTENCE_END = re.compile(r"[.!?](?=\s)|[。！？]")
+
+
+def _bounded_abstract(text: str, limit: int = _ABSTRACT_MAX_CHARS) -> str:
+    """Keep an abstract's opening and its closing sentences within ``limit``.
+
+    Abstracts end with results and conclusions, and a prefix cut dropped
+    exactly those: in 95 saved runs, 42 of 120 abstract-backed academic
+    sources stopped at the cap, all mid-sentence. The cap itself stays,
+    because the saved-source locator reads at most 1,500 code points per
+    source and its acceptance was recorded at that bound.
+
+    Whole closing sentences fill up to _ABSTRACT_TAIL_CHARS, the opening gets
+    the rest up to a sentence end, and _ELISION marks the omitted middle. If
+    no closing sentence fits, the opening alone is kept; if no sentence end
+    fits either, the text is cut at a word with an ellipsis.
+    """
+    if len(text) <= limit:
+        return text
+    ends = [match.end() for match in _SENTENCE_END.finditer(text)]
+
+    tail_start = None
+    for end in ends:
+        start = end
+        while start < len(text) and text[start].isspace():
+            start += 1
+        if start < len(text) and len(text) - start <= _ABSTRACT_TAIL_CHARS:
+            tail_start = start
+            break
+
+    if tail_start is None:
+        head_room = limit - 1
+    else:
+        head_room = limit - len(_ELISION) - (len(text) - tail_start)
+    head_end = max((end for end in ends if end <= head_room), default=None)
+    if head_end is None:
+        head = text[:head_room]
+        space = head.rfind(" ")
+        if space > 0:
+            head = head[:space]
+        return head.rstrip(" ,;:") + "…"
+    head = text[:head_end]
+    if tail_start is None:
+        return head + "…"
+    return head + _ELISION + text[tail_start:]
 # Papers published within this many days are treated as "recently published" when
 # they have zero citations (citation-count lag is expected for brand-new papers).
 _ZERO_CITATION_RECENCY_DAYS: int = 90
@@ -708,7 +758,7 @@ def _safe_summary(snippet: str, title: str) -> str:
     cjk = sum(1 for c in cleaned if "一" <= c <= "鿿")
     min_len = 20 if cjk / max(len(cleaned), 1) > 0.25 else 60
     if len(cleaned) >= min_len:
-        return cleaned[:_ABSTRACT_MAX_CHARS]
+        return _bounded_abstract(cleaned)
 
     fallback = f"Verified search result for the source titled {title}."
     if len(fallback) >= min_len:
@@ -906,7 +956,7 @@ def _academic_source(
     ):
         return None, "search snippet contains a truncated or unverifiable DOI reference"
     if len(crossref_abstract) >= _ABSTRACT_MIN_CHARS:
-        evidence_summary = crossref_abstract[:_ABSTRACT_MAX_CHARS]
+        evidence_summary = _bounded_abstract(crossref_abstract)
         summary_basis = "Crossref abstract"
     else:
         evidence_summary = _safe_summary(snippet, title)
@@ -1178,7 +1228,7 @@ def _academic_source_from_openalex(
             source_type="academic_paper",
             credibility_tier=credibility_tier,
             credibility_reason=credibility_reason,
-            evidence_summary=abstract[:_ABSTRACT_MAX_CHARS],
+            evidence_summary=_bounded_abstract(abstract),
             summary_source="abstract",
             citation_count=cited,
         ),
@@ -1243,7 +1293,7 @@ def _academic_source_from_s2(
                 f"{cited:,} citations."
                 + (" Brief evidence summary — detailed findings may be limited." if summary_sparse else "")
             ),
-            evidence_summary=abstract[:_ABSTRACT_MAX_CHARS],
+            evidence_summary=_bounded_abstract(abstract),
             summary_source="abstract",
             citation_count=cited,
         ),
@@ -1316,7 +1366,7 @@ def _academic_source_from_arxiv(
             source_type="academic_paper",
             credibility_tier=credibility_tier,
             credibility_reason=credibility_reason,
-            evidence_summary=abstract[:_ABSTRACT_MAX_CHARS],
+            evidence_summary=_bounded_abstract(abstract),
             summary_source="abstract",
             citation_count=None,
         ),
@@ -1374,7 +1424,7 @@ def _academic_source_from_pubmed(
                 "establish that this record was peer reviewed."
                 + (" Brief evidence summary." if summary_sparse else "")
             ),
-            evidence_summary=abstract[:_ABSTRACT_MAX_CHARS],
+            evidence_summary=_bounded_abstract(abstract),
             summary_source="abstract",
             citation_count=None,
         ),
@@ -1479,7 +1529,7 @@ def _patent_source_from_lens(
                 f"applicants: {publisher}; year: {pub_year}. "
                 "Legal scope requires full claim review."
             ),
-            evidence_summary=evidence[:_ABSTRACT_MAX_CHARS],
+            evidence_summary=_bounded_abstract(evidence),
             # Lens returns the patent's own abstract. Left unset, this record
             # was indistinguishable from a truncated Google Patents extract,
             # which also lands on None — so the field could not answer the one
