@@ -381,6 +381,12 @@
   max-width: 52ch;
   margin: 0 auto var(--space-8);
 }
+/* Sits in the gap .compose__sub leaves, so the composer does not move down. */
+.compose__samples {
+  text-align: center;
+  font-size: var(--text-sm);
+  margin: calc(var(--space-6) * -1) 0 var(--space-6);
+}
 
 /* The whole block is the control; the textarea inside has no chrome of its
    own, so focus is expressed by the container rather than by two nested
@@ -862,6 +868,13 @@
   text-underline-offset: 2px;
 }
 .gate__switch:hover { color: var(--text-primary); }
+.gate__samples {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  text-align: center;
+  font-size: var(--text-sm);
+}
 
 select.gate__input { cursor: pointer; }
 

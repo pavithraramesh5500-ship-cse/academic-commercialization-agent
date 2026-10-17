@@ -94,6 +94,7 @@
             commercialization potential. Reports show references, evidence gaps,
             and applicability limits.
           </p>
+          <p class="compose__samples"><a href="/samples" data-samples-i18n="samples_link">Browse sample reports — no key needed</a></p>
 
           <form id="compose-form" novalidate>
             <div class="composer" id="composer">
@@ -329,9 +330,14 @@
       <button type="button" class="gate__switch" id="byok-to-gate" data-i18n="byok_have_code">I have an access code</button>
     </form>
 
+    <!-- Outside both forms so it shows whichever one is up. A visitor with
+         neither a code nor keys otherwise has nothing to look at here. -->
+    <p class="gate__samples"><a href="/samples" data-samples-i18n="samples_link">Browse sample reports — no key needed</a></p>
+
   </div>
 </div>
 
 <script type="module" src="/static/js/app.js"></script>
+<script type="module" src="/static/js/samples_links.js"></script>
 </body>
 </html>
