@@ -44,7 +44,7 @@ from academic_agent.pdf_extractor import (  # noqa: E402
     extract_paper_contribution,
 )
 from api import access, papers, receipts, runs  # noqa: E402  — must follow load_dotenv
-from api import auxiliary_usage
+from api import auxiliary_usage, samples
 from api.cleanup import CleanupAudit  # noqa: E402
 from api.maintenance import MaintenanceDeferred  # noqa: E402
 from api.upload_boundary import PaperUploadBoundary, release_upload_slot  # noqa: E402
@@ -467,11 +467,17 @@ async def _access_gate(request: Request, call_next):
       Keeping that decision in the handler also lets resume parse fresh BYOK
       credentials without consuming and rebuilding the request body here.
       GET /api/runs itself stays gated because it lists deployment history.
+    - GET /api/samples and /api/samples/{slug} — committed example reports
+      from an allowlist (api/samples.py). They exist so a visitor without a
+      code can see a finished report; nothing behind them spends money or
+      reads deployment state.
     """
     path = request.url.path
     if not path.startswith("/api/"):
         return await call_next(request)
     if path in ("/api/runs", "/api/papers") and request.method == "POST":
+        return await call_next(request)
+    if request.method == "GET" and (path == "/api/samples" or path.startswith("/api/samples/")):
         return await call_next(request)
     if path.startswith("/api/runs/"):
         return await call_next(request)
@@ -581,6 +587,37 @@ if _WEB_ROOT.is_dir():
         fragment = "#" + run_id if valid_run_id(run_id) else ""
         link = '<a id="source-locator-link" href="/source-locator' + fragment + '">Saved-source locator</a>'
         return Response(page.replace(marker, link, 1), media_type="text/html", headers={"Cache-Control": "no-store"})
+
+    @app.get("/samples", include_in_schema=False)
+    @app.get("/samples/{slug}", include_in_schema=False)
+    def _samples_page(slug: str = "") -> FileResponse:
+        """Serve the sample-report reader for the list and every deep link.
+
+        A separate document rather than a route inside the main page: the main
+        page puts its access gate up before any view renders, and the point of
+        this one is to be readable by someone who has no code.
+        """
+        return FileResponse(_WEB_ROOT / "samples.html", media_type="text/html")
+
+
+@app.get("/api/samples", tags=["samples"])
+def list_sample_reports() -> list[dict[str, str]]:
+    """Committed example reports readable without credentials.
+
+    Historical outputs from an earlier pipeline version, listed with the
+    commit that added them; not current model accuracy or market data.
+    """
+    return samples.list_samples()
+
+
+@app.get("/api/samples/{slug}", tags=["samples"], response_class=PlainTextResponse)
+def read_sample_report(slug: str) -> PlainTextResponse:
+    """One example report as Markdown. Unknown or missing samples are 404."""
+    try:
+        text = samples.read_sample(slug)
+    except (KeyError, FileNotFoundError):
+        raise HTTPException(status_code=404, detail="No sample with that name.") from None
+    return PlainTextResponse(text, media_type="text/markdown; charset=utf-8")
 
 
 @app.get("/health", response_model=HealthStatus, tags=["meta"])

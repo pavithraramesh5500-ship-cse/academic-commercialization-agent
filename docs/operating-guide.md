@@ -324,6 +324,11 @@ semantic correctness of all report prose; see the
 | GET | `/api/runs/{id}/{artifact}` | Supported source, score, check and diagnostic artifacts |
 | DELETE | `/api/runs/{id}?intent=cancel` or `?intent=delete` | Only the requested operation, subject to state and ownership rules |
 | POST | `/api/runs/{id}/resume` | New immutable recovery child, not mutation of the old result |
+| GET | `/api/samples` | Committed example reports (allowlist in `api/samples.py`); no access code needed |
+| GET | `/api/samples/{slug}` | One example report as Markdown; unknown or missing samples return 404 |
+
+The browser reader for these samples is `/samples`. It is a separate page
+from `/` so that it renders on a gated deployment without the access gate.
 
 Readiness performs an isolated real-file write per request; concurrent probes
 do not share a filename. A cleanup-only failure is named separately from a
@@ -592,6 +597,9 @@ These are example policy values, not a cost/SLO guarantee.
   trust must be configured at the ASGI/deployment boundary.
 - Leaving all access-code variables unset disables the gate for local use.
   It is not a safe default for an operator-funded public demo.
+- `GET /api/samples` and `GET /api/samples/{slug}` stay open on a gated
+  deployment. They serve only the allowlisted files under `examples/`, read
+  no deployment state and spend nothing; other methods on those paths are gated.
 
 ### Run links, BYOK and retention
 
