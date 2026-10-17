@@ -279,6 +279,96 @@ def _is_borderline_publisher(publisher: str) -> bool:
     return any(frag in lowered for frag in _BORDERLINE_PUBLISHER_FRAGMENTS)
 
 
+# General-purpose deposit services: anyone can upload anything, with no
+# editorial screening. In 95 saved runs, 15 Zenodo deposits were graded high
+# as "journal records", one of them a pseudo-scientific text.
+_DEPOSIT_DOI_PREFIXES: dict[str, str] = {
+    "10.5281/": "Zenodo",
+    "10.6084/": "Figshare",
+    "10.17632/": "Mendeley Data",
+}
+_DEPOSIT_NAME_FRAGMENTS = ("zenodo", "figshare", "mendeley data")
+# Preprint servers screen for scope, not quality; none of them peer-reviews.
+_PREPRINT_DOI_PREFIXES: dict[str, str] = {
+    "10.1101/": "bioRxiv/medRxiv",
+    "10.48550/": "arXiv",
+    "10.31219/": "OSF Preprints",
+    "10.31234/": "PsyArXiv",
+    "10.31235/": "SocArXiv",
+    "10.36227/": "TechRxiv",
+    "10.22541/": "Authorea",
+    "10.20944/": "Preprints.org",
+    "10.21203/": "Research Square",
+    "10.26434/": "ChemRxiv",
+    "10.2139/": "SSRN",
+}
+# The citation count at which the arXiv path already treats a preprint as
+# high-impact (see the backfill pass in collect_source_collection).
+_UNREVIEWED_IMPACT_CITATIONS = 10
+_TIER_RANK = {"low": 0, "medium": 1, "high": 2}
+
+
+def _unreviewed_kind(
+    doi: str, publisher: str, *, work_type: str | None = None,
+    source_type: str | None = None,
+) -> tuple[str, str] | None:
+    """Classify a record as ("deposit"|"preprint", service name), or None.
+
+    The DOI prefix decides first because it is present on every path; the
+    OpenAlex work/source types and the Crossref item type cover servers not
+    listed above.
+    """
+    doi = doi.lower()
+    for prefix, name in _DEPOSIT_DOI_PREFIXES.items():
+        if doi.startswith(prefix):
+            return "deposit", name
+    if any(fragment in publisher.lower() for fragment in _DEPOSIT_NAME_FRAGMENTS):
+        return "deposit", publisher
+    if work_type == "dataset":
+        return "deposit", publisher or "dataset repository"
+    for prefix, name in _PREPRINT_DOI_PREFIXES.items():
+        if doi.startswith(prefix):
+            return "preprint", name
+    if work_type in ("preprint", "posted-content") or source_type == "repository":
+        return "preprint", publisher or "preprint server"
+    return None
+
+
+def _grade_unreviewed(
+    tier: str, reason: str, *, doi: str, publisher: str, cited: int,
+    work_type: str | None = None, source_type: str | None = None,
+) -> tuple[str, str]:
+    """Cap the tier of a deposit or preprint and say why; never raise it.
+
+    Deposits cap at low (medium once cited), preprints at medium (high once
+    cited), matching the existing arXiv rule. An already stricter grade, such
+    as a predatory publisher's low, keeps its own reason. The reason never
+    contains "0 citation": the backfill pass upgrades medium sources whose
+    reason does, which would undo this cap.
+    """
+    kind = _unreviewed_kind(doi, publisher, work_type=work_type, source_type=source_type)
+    if kind is None:
+        return tier, reason
+    category, name = kind
+    impact = cited >= _UNREVIEWED_IMPACT_CITATIONS
+    if category == "deposit":
+        cap = "medium" if impact else "low"
+        note = (
+            f"General-purpose repository deposit ({name}): no editorial screening "
+            f"or peer review; citations: {cited:,}. Do not rely on it for material "
+            "conclusions without independent corroboration."
+        )
+    else:
+        cap = "high" if impact else "medium"
+        note = (
+            f"Preprint ({name}): not peer-reviewed; citations: {cited:,}. State "
+            "findings as provisional and corroborate with published work."
+        )
+    if _TIER_RANK[tier] < _TIER_RANK[cap]:
+        return tier, reason
+    return cap, note
+
+
 _REPUTABLE_NEWS_DOMAINS = {
     "reuters.com",
     "apnews.com",
@@ -991,6 +1081,11 @@ def _academic_source(
             f"Publisher '{publisher}' operates legitimate journals but is flagged for "
             "volume/speed issues; verify the specific journal's impact factor."
         )
+    # Crossref types preprints as "posted-content".
+    credibility_tier, credibility_reason = _grade_unreviewed(
+        credibility_tier, credibility_reason, doi=doi, publisher=publisher, cited=cited,
+        work_type=str(item.get("type") or "") or None,
+    )
     return (
         EvidenceSource(
             source_id=source_id,
@@ -1216,6 +1311,11 @@ def _academic_source_from_openalex(
             f"Publisher '{publisher}' operates legitimate journals but is flagged for "
             "volume/speed issues; verify the specific journal's impact factor."
         )
+    credibility_tier, credibility_reason = _grade_unreviewed(
+        credibility_tier, credibility_reason, doi=doi, publisher=publisher, cited=cited,
+        work_type=str(work.get("type") or "") or None,
+        source_type=str(source_meta.get("type") or "") or None,
+    )
     return (
         EvidenceSource(
             source_id=source_id,
@@ -1276,6 +1376,14 @@ def _academic_source_from_s2(
 
     cited = int(paper.get("citationCount") or 0)
     summary_sparse = len(abstract) < 120
+    credibility_tier, credibility_reason = _grade_unreviewed(
+        "medium" if summary_sparse else "high",
+        f"Semantic Scholar record: DOI resolves; journal record "
+        f"(peer-review status not independently verified), "
+        f"{cited:,} citations."
+        + (" Brief evidence summary — detailed findings may be limited." if summary_sparse else ""),
+        doi=doi, publisher=publisher, cited=cited,
+    )
     return (
         EvidenceSource(
             source_id=source_id,
@@ -1286,13 +1394,8 @@ def _academic_source_from_s2(
             published_date=published,
             accessed_date=accessed_date,
             source_type="academic_paper",
-            credibility_tier="medium" if summary_sparse else "high",
-            credibility_reason=(
-                f"Semantic Scholar record: DOI resolves; journal record "
-                f"(peer-review status not independently verified), "
-                f"{cited:,} citations."
-                + (" Brief evidence summary — detailed findings may be limited." if summary_sparse else "")
-            ),
+            credibility_tier=credibility_tier,
+            credibility_reason=credibility_reason,
             evidence_summary=_bounded_abstract(abstract),
             summary_source="abstract",
             citation_count=cited,
