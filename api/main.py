@@ -38,6 +38,7 @@ from fastapi.staticfiles import StaticFiles
 # contract — an API server should be explicit about when its settings exist.
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
+from academic_agent.byok_model import BYOK_MODEL_PATTERN  # noqa: E402
 from academic_agent.llm_config import _detect_provider, validate_llm_configuration  # noqa: E402
 from academic_agent.pdf_extractor import (  # noqa: E402
     PaperContribution,
@@ -922,6 +923,20 @@ def submit_run(request: RunRequest, http_request: Request) -> RunAccepted:
                              lambda: _submit_run_without_receipt(request, http_request))
 
 
+def _byok_credentials(request: RunRequest | ResumeRunRequest) -> runs.BYOKCredentials | None:
+    """The visitor's complete credential set, or None for operator billing.
+
+    The request model has already rejected partial sets, so a BYOK request
+    never falls back to the deployment's keys.
+    """
+    if not request.byok:
+        return None
+    return runs.BYOKCredentials(
+        request.llm_provider, request.llm_api_key, request.serper_api_key,
+        llm_model=request.llm_model, tavily_api_key=request.tavily_api_key,
+    )
+
+
 def _submit_run_without_receipt(request: RunRequest, http_request: Request) -> RunAccepted:
     """Queue an assessment. Returns immediately with a run_id to poll.
 
@@ -940,7 +955,8 @@ def _submit_run_without_receipt(request: RunRequest, http_request: Request) -> R
     if matched is None and not request.byok and access.gate_enabled():
         raise HTTPException(
             status_code=401,
-            detail="Provide the access code, or your own llm_provider/llm_api_key/serper_api_key.",
+            detail="Provide the access code, or your own llm_provider/llm_api_key "
+                   "and a tavily_api_key or serper_api_key.",
         )
     # BYOK runs get no owner tag at all — never recorded in anyone's history,
     # billed to the requester, gone once the tab closes (frontend keeps its
@@ -958,10 +974,7 @@ def _submit_run_without_receipt(request: RunRequest, http_request: Request) -> R
         except papers.PaperNotFound as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    byok = (
-        runs.BYOKCredentials(request.llm_provider, request.llm_api_key, request.serper_api_key)
-        if request.byok else None
-    )
+    byok = _byok_credentials(request)
 
     try:
         run_id, _ = runs.start_run(
@@ -1048,13 +1061,7 @@ def _resume_run_without_receipt(run_id: str, request: ResumeRunRequest, http_req
             detail="Provide the access code, or fresh BYOK credentials to resume.",
         )
     owner = access.owner_id(matched) if matched and not request.byok else None
-    byok = (
-        runs.BYOKCredentials(
-            request.llm_provider, request.llm_api_key, request.serper_api_key
-        )
-        if request.byok
-        else None
-    )
+    byok = _byok_credentials(request)
 
     try:
         child_id, child_directory = runs.resume_run(
@@ -1363,6 +1370,7 @@ def _extract_paper_with_paid_reservation(
     byok: bool,
     llm_provider: str | None,
     llm_api_key: str | None,
+    llm_model: str | None = None,
 ) -> PaperContribution:
     """Extract while the actual worker thread owns the paid-operation slot.
 
@@ -1376,6 +1384,7 @@ def _extract_paper_with_paid_reservation(
             pdf_path,
             llm_provider=llm_provider if byok else None,
             llm_api_key=llm_api_key if byok else None,
+            llm_model=llm_model if byok else None,
         )
 
 
@@ -1492,6 +1501,7 @@ async def upload_paper(
     file: UploadFile = File(...),
     llm_provider: str | None = Form(default=None),
     llm_api_key: str | None = Form(default=None),
+    llm_model: str | None = Form(default=None),
 ) -> PaperExtraction:
     """Extract a paper's contribution from an uploaded PDF.
 
@@ -1520,6 +1530,16 @@ async def upload_paper(
             status_code=422,
             detail=f"llm_provider must be one of {BYOK_PROVIDERS}.",
         )
+    # Extraction never searches, so no search key is involved here; the model
+    # only applies to the visitor's own key. Direct (non-HTTP) callers receive
+    # the Form() default object rather than None, and an empty form field
+    # means "provider default", so only a non-empty string names a model.
+    llm_model = (llm_model.strip() or None) if isinstance(llm_model, str) else None
+    if llm_model is not None and (not llm_provider or not BYOK_MODEL_PATTERN.fullmatch(llm_model)):
+        raise HTTPException(
+            status_code=422,
+            detail="llm_model requires llm_provider and must be a plain model identifier.",
+        )
     byok = bool(llm_provider)
     matched = access.matching_code(http_request.headers.get("x-access-code"))
     if matched is None and not byok and access.gate_enabled():
@@ -1536,7 +1556,8 @@ async def upload_paper(
     ticket, prior = await asyncio.to_thread(
         _claim_receipt, http_request, byok=byok, kind="paper",
         payload={"pdf_sha256": hashlib.sha256(data).hexdigest(),
-                 "llm_provider": llm_provider, "llm_api_key": llm_api_key},
+                 "llm_provider": llm_provider, "llm_api_key": llm_api_key,
+                 "llm_model": llm_model},
     )
     if prior is not None:
         del data
@@ -1549,14 +1570,16 @@ async def upload_paper(
     with receipts.activate(ticket):
         try:
             return await _upload_paper_bytes(buffer, http_request, owner=owner, byok=byok,
-                                             llm_provider=llm_provider, llm_api_key=llm_api_key)
+                                             llm_provider=llm_provider, llm_api_key=llm_api_key,
+                                             llm_model=llm_model)
         except HTTPException as exc:
             if ticket is not None:
                 await asyncio.to_thread(_record_rejection, ticket, exc)
             raise
 
 
-async def _upload_paper_bytes(buffer: list[bytes], http_request: Request, *, owner, byok, llm_provider, llm_api_key):
+async def _upload_paper_bytes(buffer: list[bytes], http_request: Request, *, owner, byok, llm_provider, llm_api_key,
+                              llm_model=None):
     data = buffer.pop()
     try:
         paper_id, pdf_path = papers.save_upload(data, owner=owner)
@@ -1572,7 +1595,8 @@ async def _upload_paper_bytes(buffer: list[bytes], http_request: Request, *, own
     release_upload_slot(http_request.scope)
     try:
         return await _uploaded_paper_result(paper_id, pdf_path, owner=owner, byok=byok,
-                                            llm_provider=llm_provider, llm_api_key=llm_api_key)
+                                            llm_provider=llm_provider, llm_api_key=llm_api_key,
+                                            llm_model=llm_model)
     except HTTPException as exc:
         summary = await asyncio.to_thread(auxiliary_usage.paper_summary, paper_id)
         raise _PaperHTTPError(exc, summary) from exc
@@ -1582,7 +1606,8 @@ async def _upload_paper_bytes(buffer: list[bytes], http_request: Request, *, own
         raise _PaperHTTPError(original, summary) from exc
 
 
-async def _uploaded_paper_result(paper_id, pdf_path, *, owner, byok, llm_provider, llm_api_key):
+async def _uploaded_paper_result(paper_id, pdf_path, *, owner, byok, llm_provider, llm_api_key,
+                                 llm_model=None):
     try:
         contribution = await _process_uploaded_paper(
             paper_id, str(pdf_path),
@@ -1590,6 +1615,7 @@ async def _uploaded_paper_result(paper_id, pdf_path, *, owner, byok, llm_provide
             byok=byok,
             llm_provider=llm_provider,
             llm_api_key=llm_api_key,
+            llm_model=llm_model,
         )
     except runs.ConcurrencyLimitReached as exc:
         raise HTTPException(

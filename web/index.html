@@ -314,17 +314,28 @@
       <p class="gate__sub gate__sub--retention" id="byok-retention"></p>
       <select class="gate__input" id="byok-provider" aria-label="LLM provider">
         <option value="deepseek">DeepSeek</option>
-        <option value="qwen">Qwen3.5 Plus</option>
+        <option value="qwen">Qwen (Alibaba Model Studio)</option>
         <option value="openai">OpenAI</option>
         <option value="anthropic">Anthropic</option>
       </select>
       <input class="gate__input" id="byok-llm-key" type="password" autocomplete="off"
              data-i18n-placeholder="byok_llm_placeholder" placeholder="LLM API key">
-      <input class="gate__input" id="byok-serper-key" type="password" autocomplete="off"
-             data-i18n-placeholder="byok_serper_placeholder" placeholder="Serper API key">
-      <p class="gate__hint" data-i18n="byok_hint">
+      <!-- The model the visitor's own key should use. Empty means the
+           provider's default, which byok_fields.js shows as the placeholder. -->
+      <input class="gate__input" id="byok-model" type="text" autocomplete="off" spellcheck="false"
+             maxlength="100" placeholder="Model (optional)">
+      <!-- Tavily first: Serper refuses requests from some hosting providers,
+           including this deployment's, so a Serper-only run may find nothing. -->
+      <select class="gate__input" id="byok-search" aria-label="Web search service">
+        <option value="tavily">Tavily</option>
+        <option value="serper">Serper</option>
+      </select>
+      <input class="gate__input" id="byok-search-key" type="password" autocomplete="off"
+             placeholder="Search API key">
+      <p class="gate__hint" data-byok-i18n="byok_hint">
         Keys: platform.deepseek.com/api-keys · bailian.console.aliyun.com (China Qwen) ·
-        platform.openai.com/api-keys · console.anthropic.com — plus serper.dev/api-key for search.
+        platform.openai.com/api-keys · console.anthropic.com — plus app.tavily.com
+        (recommended) or serper.dev for search.
       </p>
       <button type="submit" class="btn btn--primary" id="byok-submit" data-i18n="byok_submit">Start</button>
       <button type="button" class="gate__switch" id="byok-to-gate" data-i18n="byok_have_code">I have an access code</button>
@@ -339,5 +350,6 @@
 
 <script type="module" src="/static/js/app.js"></script>
 <script type="module" src="/static/js/samples_links.js"></script>
+<script type="module" src="/static/js/byok_fields.js"></script>
 </body>
 </html>

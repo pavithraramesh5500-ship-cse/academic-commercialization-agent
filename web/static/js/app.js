@@ -1009,11 +1009,14 @@ function showGate(errorKey = null) {
       if (codeSubmit.disabled || finished) return;
       const provider = $("#byok-provider").value;
       const llmKey = $("#byok-llm-key").value.trim();
-      const serperKey = $("#byok-serper-key").value.trim();
-      if (!llmKey || !serperKey) return;
+      // Empty model means the provider's default, shown as the placeholder.
+      const model = $("#byok-model").value.trim();
+      const search = $("#byok-search").value;
+      const searchKey = $("#byok-search-key").value.trim();
+      if (!llmKey || !searchKey) return;
 
       try {
-        api.setByok({ provider, llmKey, serperKey });
+        api.setByok({ provider, llmKey, search, searchKey, ...(model ? { model } : {}) });
       } catch (err) {
         toast(operationErrorMessage(err), "error");
         return;
