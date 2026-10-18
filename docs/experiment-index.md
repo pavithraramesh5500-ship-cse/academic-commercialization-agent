@@ -8,6 +8,8 @@ the current evidence status for today's qualified conclusions; open a dated
 protocol or result when tracing a specific decision. An archive link does not
 authorize rerunning a paid batch, moving its files or treating a failed gate as passed.
 
+- [2026-10-18 held-out TRL calibration v1 protocol](prereg-2026-10-18-heldout-trl-v1.md): ten topics never run before, with expected ranges anchored from external evidence and frozen in `evals/heldout_trl_v1/cohort.json` before any run; registered thresholds (≥21/30 supported, ≤15/30 not supported); includes one short and two Chinese inputs. Prepared, not yet authorized or run.
+
 - [2026-10-11 Reviewer follow-up closeout](results-2026-10-11-reviewer-follow-up-closeout.md): the separate reason-schema invocation stopped at RSP01 with `observation_unavailable`; RSP02/RSP03 are `not_run`, POST count and usage are unknown, and the consumed invocation cannot be replayed. A later offline parser diagnostic found only R5 on one local snapshot, with no provider call and no conclusion about provider authentication or the historical failure.
 
 - [2026-10-10 Reviewer comparison v3 closeout](results-2026-10-10-reviewer-comparison-v3.md): all eight ordinary checks and four preparation cells passed before one response violated the transmitted 300-code-point reason bound; zero reports were delivered, semantic comparison is `not_run`, and the consumed batch is closed without repair or retry.
