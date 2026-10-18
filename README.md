@@ -16,7 +16,7 @@ reports are in [examples/](examples/README.md), for instance
 [Solid-state batteries for electric vehicles](examples/solid-state-batteries-ev.md)
 ([frozen 2026-07-19 version, 9673a83](https://github.com/shuxiachai/academic-commercialization-agent/blob/9673a8346c15f11b989ce8fd2d85be484d1c27b3/examples/solid-state-batteries-ev.md)).
 Starting a new analysis needs an operator-issued access code **or** BYOK
-(a supported LLM API key plus a Serper search key), and incurs provider usage.
+(your own LLM API key and model, plus a Tavily or Serper search key), and incurs provider usage.
 The screenshot and samples are different historical runs; neither represents
 current model accuracy or an up-to-date market assessment.
 

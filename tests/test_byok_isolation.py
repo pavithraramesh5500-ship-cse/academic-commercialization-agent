@@ -499,4 +499,5 @@ class QwenBrowserBoundaryTests(unittest.TestCase):
         source = (
             Path(__file__).resolve().parent.parent / "web" / "index.html"
         ).read_text(encoding="utf-8")
-        self.assertIn('<option value="qwen">Qwen3.5 Plus</option>', source)
+        # The label no longer names one model: the visitor chooses the model.
+        self.assertIn('<option value="qwen">', source)

@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 
 from crewai import LLM
 
+from academic_agent.byok_model import BYOK_MODEL_PATTERN, MODEL_ENV_NAMES  # noqa: F401 - re-exported
 from academic_agent.runtime_budget import WORKER_LLM_TIMEOUT_ENV
 
 _SUPPORTED_PROVIDERS = ("deepseek", "qwen", "openai", "anthropic")
@@ -34,6 +35,15 @@ _PROVIDER_KEY_NAMES = {
 # and apply provider-specific accounting without labelling the request OpenAI.
 _QWEN_MODEL = "qwen3.5-plus"
 _QWEN_API_BASE = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+#: Model used when a provider is chosen without naming one: the operator sets
+#: none, or a BYOK visitor leaves the model field empty.
+DEFAULT_MODELS = {
+    "deepseek": "deepseek-chat",
+    "qwen": _QWEN_MODEL,
+    "openai": "gpt-4o",
+    "anthropic": "claude-sonnet-5",
+}
 
 # Providers that support response_format={"type": "json_object"}.
 # Anthropic does not — it relies on prompt instructions + guardrail validation.
@@ -112,6 +122,7 @@ class ProviderConfig:
 
 def resolve_provider_config(
     *, provider: str | None = None, api_key: str | None = None,
+    model: str | None = None,
 ) -> ProviderConfig:
     """Resolve locally; explicit BYOK ignores every operator model/base/key.
 
@@ -119,20 +130,29 @@ def resolve_provider_config(
     Known vendor destinations may not contradict the selected provider.
     Missing/partial credentials fail before construction, never fall back to
     the operator's account. No dotenv reload may undo the worker's sentinels.
+
+    ``model`` lets an explicit BYOK caller choose the model for their own
+    key. It is accepted only with explicit credentials and only in the
+    BYOK_MODEL_PATTERN shape; the endpoint stays the provider's.
     """
     explicit = provider is not None or api_key is not None
     if explicit and (not provider or not api_key or not api_key.strip()):
         raise RuntimeError("Provider and non-empty API key must be supplied together.")
+    if model is not None and not explicit:
+        raise RuntimeError("A model can only be chosen together with explicit credentials.")
+    if model is not None and not BYOK_MODEL_PATTERN.fullmatch(model):
+        raise RuntimeError("Model must be a plain model identifier.")
     selected = provider.lower().strip() if explicit else _detect_provider()
     defaults = {
-        "deepseek": ("deepseek-chat", "https://api.deepseek.com"),
-        "qwen": (_QWEN_MODEL, _QWEN_API_BASE),
-        "openai": ("gpt-4o", "https://api.openai.com/v1"),
-        "anthropic": ("claude-sonnet-5", "https://api.anthropic.com"),
+        "deepseek": (DEFAULT_MODELS["deepseek"], "https://api.deepseek.com"),
+        "qwen": (DEFAULT_MODELS["qwen"], _QWEN_API_BASE),
+        "openai": (DEFAULT_MODELS["openai"], "https://api.openai.com/v1"),
+        "anthropic": (DEFAULT_MODELS["anthropic"], "https://api.anthropic.com"),
     }
     if selected not in defaults:
         raise RuntimeError("Unknown LLM_PROVIDER; supported: " + ", ".join(_SUPPORTED_PROVIDERS))
-    model, base = defaults[selected]
+    model_default, base = defaults[selected]
+    model = model or model_default
     key = api_key if explicit else _configured_api_key(selected)
     if not explicit:
         names = {
@@ -349,6 +369,7 @@ def create_llm(
     temperature: float | None = None,
     provider: str | None = None,
     api_key: str | None = None,
+    model: str | None = None,
 ) -> LLM:
     """Create an LLM instance for the active provider.
 
@@ -366,7 +387,7 @@ def create_llm(
     OPENAI_API_BASE pointing somewhere else is exactly the redirect the
     scrubbing exists to prevent, and it would apply here too.
     """
-    config = resolve_provider_config(provider=provider, api_key=api_key)
+    config = resolve_provider_config(provider=provider, api_key=api_key, model=model)
     logical_provider = config.provider
     # Explicit bases also defeat SDK-specific OPENAI_BASE_URL /
     # ANTHROPIC_BASE_URL defaults inside the shared API process.

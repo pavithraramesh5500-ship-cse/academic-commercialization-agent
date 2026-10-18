@@ -24,7 +24,9 @@ uv sync
 ```
 
 For Qwen, explicitly set `LLM_PROVIDER=qwen`, `DASHSCOPE_API_KEY` and
-`QWEN_MODEL=qwen3.5-plus`. The built-in China-region compatible endpoint is
+`QWEN_MODEL`. The public deployment uses `qwen3.8-max` (since 2026-10-18); an
+unset `QWEN_MODEL` falls back to the code default `qwen3.5-plus`, or to
+`OPENAI_MODEL_NAME` when that is set, so set it explicitly. The built-in China-region compatible endpoint is
 `https://dashscope.aliyuncs.com/compatible-mode/v1`; operators may override
 `QWEN_API_BASE` for their account/region. The browser BYOK endpoint is fixed
 by the provider contract rather than accepting arbitrary visitor URLs.
@@ -611,7 +613,19 @@ as well; recovery still needs fresh complete credentials.
 BYOK credentials are passed to the individual child environment, not merged
 into the operator environment or persisted in run artifacts. Empty sentinels
 prevent import-time dotenv loading from restoring operator keys. PDF extraction
-uses the same isolated credential contract. The client keeps BYOK history in
+uses the same isolated credential contract.
+
+A BYOK visitor chooses the model for their own key (`llm_model`; empty means
+the provider default shown in the form). The name must be a plain identifier
+(letters, digits and `. _ - :`). It fills only the selected provider's model
+variable, while the endpoint stays the provider's fixed one, so it cannot
+redirect the key. The operator's `QWEN_MODEL` never applies to a visitor's
+run. The model must support the pipeline's JSON Object output. A model that
+does not support it fails on the visitor's own key. A visitor searches with
+exactly one of `tavily_api_key` or `serper_api_key`. The form recommends
+Tavily because Serper rejected requests from Railway. Earlier `serper_api_key`
+clients and stored browser credentials remain valid. Resuming with a
+different model re-executes nodes, because checkpoint identity binds the model. The client keeps BYOK history in
 session storage; closing a tab removes that client history, **not** an already
 running server job or the persisted report.
 

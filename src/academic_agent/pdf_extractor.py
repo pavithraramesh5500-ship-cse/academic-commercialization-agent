@@ -209,6 +209,7 @@ def _call_llm_json(
     system_prompt: str | None = None,
     provider: str | None = None,
     api_key: str | None = None,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Call the LLM via crewai.LLM and return parsed JSON.
 
@@ -219,7 +220,7 @@ def _call_llm_json(
     from academic_agent.llm_config import create_llm
 
     llm = create_llm(json_mode=True, temperature=0.0,
-                     provider=provider, api_key=api_key)
+                     provider=provider, api_key=api_key, model=model)
     messages = []
     if system_prompt:
         # The uploaded paper belongs in a lower-trust user message. Keeping
@@ -363,11 +364,13 @@ def extract_paper_contribution(
     *,
     llm_provider: str | None = None,
     llm_api_key: str | None = None,
+    llm_model: str | None = None,
 ) -> PaperContribution:
     """Extract structured contribution metadata from an academic PDF using LLM.
 
     llm_provider/llm_api_key bill the extraction to a visitor bringing their
-    own key. Omitted, it runs on the deployment's own credentials as before.
+    own key, and llm_model optionally names the model for that key. Omitted,
+    it runs on the deployment's own credentials as before.
     """
     coverage: dict = {}
     text = extract_pdf_text(pdf_path, coverage=coverage)
@@ -385,6 +388,7 @@ def extract_paper_contribution(
         system_prompt=_PAPER_EXTRACTION_SYSTEM_PROMPT,
         provider=llm_provider,
         api_key=llm_api_key,
+        model=llm_model,
     )
 
     # A model locator may name a different real paper. Only retain locators

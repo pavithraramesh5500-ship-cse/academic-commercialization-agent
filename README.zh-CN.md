@@ -13,7 +13,7 @@
 提供三份完整评估，打开时不发起任何模型或检索请求。同样的报告也在
 [examples/](examples/README.md) 中，例如[电动汽车用固态电池](examples/solid-state-batteries-ev.md)
 （[2026-07-19 冻结版本，9673a83](https://github.com/shuxiachai/academic-commercialization-agent/blob/9673a8346c15f11b989ce8fd2d85be484d1c27b3/examples/solid-state-batteries-ev.md)）。
-新建分析需要作者提供的访问码，或使用 BYOK（支持的模型 API key + Serper 检索 key），
+新建分析需要作者提供的访问码，或使用 BYOK（自己的模型 API key 与模型 + Tavily 或 Serper 检索 key），
 并会产生供应商用量。截图与样例来自不同历史运行，不代表当前模型准确率或最新市场判断。
 
 技术实现为 Python、CrewAI、FastAPI 和无需构建的 JavaScript 客户端。

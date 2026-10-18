@@ -319,7 +319,7 @@ const scenarios = {
     f.get('#gate-to-byok').onclick();
     assert.equal(f.get('#byok-form').hidden, true);
     f.get('#byok-provider').value = 'qwen'; f.get('#byok-llm-key').value = 'fixture-B';
-    f.get('#byok-serper-key').value = 'fixture-search-B';
+    f.get('#byok-search').value = 'tavily'; f.get('#byok-search-key').value = 'fixture-search-B';
     f.get('#byok-form').onsubmit({preventDefault(){}});
     assert.equal(api.getByok(), null, 'A pending code check cannot race a new BYOK identity');
     assert.equal(f.get('#gate').hidden, false);
@@ -328,7 +328,7 @@ const scenarios = {
   async gate_finished() {
     const f = fixture(); const gate = f.run('showGate()');
     f.get('#byok-provider').value = 'qwen'; f.get('#byok-llm-key').value = 'fixture-A';
-    f.get('#byok-serper-key').value = 'fixture-search';
+    f.get('#byok-search').value = 'tavily'; f.get('#byok-search-key').value = 'fixture-search';
     f.get('#byok-form').onsubmit({preventDefault(){}}); await gate;
     f.get('#byok-llm-key').value = 'fixture-B';
     f.get('#byok-form').onsubmit({preventDefault(){}});
@@ -355,7 +355,7 @@ const scenarios = {
     assert.equal(f.run('attachedPaper'), null);
     assert.equal(f.get('#topic').value, '');
     f.get('#byok-provider').value = 'qwen';
-    f.get('#byok-llm-key').value = 'fixture-B'; f.get('#byok-serper-key').value = 'fixture-search-B';
+    f.get('#byok-llm-key').value = 'fixture-B'; f.get('#byok-search').value = 'tavily'; f.get('#byok-search-key').value = 'fixture-search-B';
     f.get('#byok-form').onsubmit({preventDefault(){}}); await exit;
     f.topic('Identity B topic'); const submitted = f.submit();
     const body = JSON.parse(f.requests[1].options.body);
