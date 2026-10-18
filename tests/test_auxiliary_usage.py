@@ -130,6 +130,18 @@ def test_unknown_model_and_legacy_or_corrupt_sidecar_are_not_empty_success(tmp_p
     assert broken.summary()["record_state"] == "write_failed" and path.read_bytes() == before
 
 
+@pytest.mark.parametrize("model", ["qwen3.7-plus", "qwen3.8-max"])
+def test_production_qwen_models_are_known_helper_identities(model, tmp_path):
+    """Helper calls on the current production models must not be recorded as
+    unknown-model observations with no tokens."""
+    collector = ledger(tmp_path)
+    seq = collector.begin("translation", "http_attempt", model)
+    collector.settle(seq, aux.parse_usage(USAGE, model), "returned")
+    collector.finish()
+    assert collector.summary()["call_count"] == 1
+    assert collector.summary()["observed_tokens"] == 12
+
+
 def test_same_call_finalization_is_not_cumulative(tmp_path):
     """Duplicate settlement previously could turn one observed charge into two."""
     collector = ledger(tmp_path)
