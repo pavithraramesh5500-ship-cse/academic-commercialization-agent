@@ -8,6 +8,8 @@ the current evidence status for today's qualified conclusions; open a dated
 protocol or result when tracing a specific decision. An archive link does not
 authorize rerunning a paid batch, moving its files or treating a failed gate as passed.
 
+- [2026-10-18 held-out TRL v1 amendment: measure `qwen3.7-plus` in batch c](protocol-2026-10-18-heldout-trl-v1-amendment-qwen37.md): batch `heldout-trl-v1-b` (`qwen3.5-plus`) stopped on a provider `Arrearage` account error after five successes, one false-positive monitor kill and one account failure; no outcome was inspected. The maintainer chose `qwen3.7-plus`, so all 30 runs repeat in `heldout-trl-v1-c` with an upper-bound price basis. Results will describe `qwen3.7-plus`, not production's model. Cohort, ranges and thresholds are unchanged.
+
 - [2026-10-18 held-out TRL v1 erratum: first batch stopped on a runner defect](errata-2026-10-18-heldout-trl-v1-harness.md): batch `heldout-trl-v1` halted by its stop rule after three kickoff failures (`benchmark.py` omitted the Decision Context template inputs, a defect present since that feature landed); no TRL was produced or inspected. The runner was fixed with an offline template-coverage test, and the measurement repeats as batch `heldout-trl-v1-b` under the unchanged protocol.
 
 - [2026-10-18 held-out TRL calibration v1 protocol](prereg-2026-10-18-heldout-trl-v1.md): ten topics never run before, with expected ranges anchored from external evidence and frozen in `evals/heldout_trl_v1/cohort.json` before any run; registered thresholds (≥21/30 supported, ≤15/30 not supported); includes one short and two Chinese inputs. Prepared, not yet authorized or run.
