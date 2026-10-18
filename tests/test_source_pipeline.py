@@ -1144,7 +1144,7 @@ class MarketSlotSharingTests(TestCase):
                 arxiv=_NullArXiv(),
                 lens=_NullLens(),
                 url_checker=lambda url: (True, ""),
-                accessed_date=date(2026, 10, 19),
+                accessed_date=date(2026, 10, 1),
             )
 
         admitted = {
@@ -1173,7 +1173,7 @@ class MarketEstimateReleaseTests(TestCase):
     def _classify(self, title: str, link: str):
         source, reason = _web_source(
             {"title": title, "link": link, "snippet": _LONG_MARKET_SNIPPET},
-            "M1", "market", date(2026, 10, 19), lambda url: (True, ""),
+            "M1", "market", date(2026, 10, 1), lambda url: (True, ""),
         )
         self.assertIsNotNone(source, reason)
         return source
