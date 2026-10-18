@@ -9,7 +9,7 @@ import warnings
 from datetime import date, datetime, UTC
 from difflib import SequenceMatcher
 from typing import Any, Literal
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from urllib.error import URLError
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
@@ -598,6 +598,19 @@ _MARKET_REPORT_SOFT_CAP = 4
 # Maximum Serper results processed per query; limits first-query slot exhaustion
 # so subsequent queries in the same domain have a chance to contribute sources.
 _SERPER_MAX_RESULTS_PER_QUERY = 8
+# Market domain: at most this many accepted sources per query, so the eight
+# slots are shared between deployment, market-size and revenue queries instead
+# of going to whichever query runs first. The cap above was meant to do this,
+# but it equals the slot count, so one query could still fill the domain.
+_MARKET_SOURCES_PER_QUERY = 3
+# A component's market query reserves coverage for that building block, and one
+# source shows it is represented. Unbounded, a generic component query filled
+# most market slots with component-level reports: 166 of 219 market sources on
+# the 2026-10-18 held-out runs, e.g. six general UAV market reports for drone
+# delivery of medical supplies. The scorer's SCOPE MATCH RULE then discounts
+# them as evidence about a narrower thing, and the queries naming the topic
+# itself never ran.
+_COMPONENT_MARKET_SOURCES_PER_QUERY = 1
 
 # Country-specific government TLD patterns (non-.gov forms used internationally).
 # Defined at module level to avoid recreating the tuple on every call to
@@ -1657,6 +1670,27 @@ def _host_matches(host: str, domains: set[str]) -> bool:
     )
 
 
+# A market-size or industry-report release keeps its wording when a news or
+# press-wire host carries it. On the 2026-10-18 held-out runs, 40 of the 75
+# sources classed as news were such releases, most syndicated on
+# finance.yahoo.com. As news they escaped _MARKET_REPORT_SOFT_CAP and satisfied
+# the company-news guard, so a run could hold no actual company news. Each
+# alternative requires market-estimate wording; a bare amount ("raises $1
+# billion") is a commercial event and must not match. Over the 83 distinct
+# news and company titles of those runs, the 34 matches were all estimates and
+# the 49 non-matches were company or news items.
+_MARKET_ESTIMATE_TITLE = re.compile(
+    r"\bmarket\s+(?:size|share|report|research|forecast|analysis|outlook|trends"
+    r"|opportunit(?:y|ies))\b"
+    r"|\b(?:industry|research)\s+(?:report|research|analysis)\b"
+    r"|\bCAGR\b"
+    r"|\bmarket\s+(?:is\s+)?(?:worth|poised|projected|expected|estimated|set"
+    r"|to\s+(?:reach|hit|surpass|grow|skyrocket))\b"
+    r"|市场规模|市场报告|行业报告|研究报告|市场前景|市场分析|复合增长率",
+    re.IGNORECASE,
+)
+
+
 def _market_source_profile(
     canonical_url: str,
     host: str,
@@ -2162,6 +2196,16 @@ def _web_source(
         if profile is None:
             return None, f"market host is blocked or not approved: {host}"
         source_type, credibility_tier, credibility_reason = profile
+        if (
+            source_type in ("reputable_news", "company_disclosure")
+            and _MARKET_ESTIMATE_TITLE.search(title)
+        ):
+            source_type = "market_report"
+            credibility_reason = (
+                f"Market-estimate release carried by {host}; counted as a "
+                "commercial market estimate, not as reporting or a company "
+                "disclosure. " + credibility_reason
+            )
         authority_category = _authority_category_for_url(canonical)
         title_decision = recover_official_source_title(
             title,
@@ -2389,6 +2433,30 @@ def _clinical_scope_warning(topic: str, weight_profile: str) -> str | None:
     )
 
 
+def _component_terms(components: Sequence[str]) -> list[str]:
+    return [
+        " ".join(component.split())
+        for component in components[:4]
+        if len(" ".join(component.split())) >= 3
+    ]
+
+
+def _component_market_query(component: str) -> str:
+    return f"{component} company product commercial deployment {_recent_years()}"
+
+
+def _market_query_limits(
+    market_queries: Sequence[str], components: Sequence[str],
+) -> dict[str, int]:
+    """Per-query source limits for the primary market pass."""
+    limits = dict.fromkeys(market_queries, _MARKET_SOURCES_PER_QUERY)
+    for component in _component_terms(components):
+        query = _component_market_query(component)
+        if query in limits:
+            limits[query] = _COMPONENT_MARKET_SOURCES_PER_QUERY
+    return limits
+
+
 def _queries(
     topic: str,
     *,
@@ -2405,11 +2473,7 @@ def _queries(
     # without including metric clauses (e.g. "improving X by 12.1%") that
     # appear in no market report.
     _mkt_short = " ".join(_pat_clean.split()[:6])
-    component_terms = [
-        " ".join(component.split())
-        for component in components[:4]
-        if len(" ".join(component.split())) >= 3
-    ]
+    component_terms = _component_terms(components)
     patent: list[str] = [
         f"{topic} site:patents.google.com/patent",
         f"{topic} site:patentscope.wipo.int",
@@ -2449,21 +2513,25 @@ def _queries(
             f"{topic} trial results status site:clinicaltrials.gov"
         )
     market_templates = [
-        # Short-form queries first: more likely to match market/industry reports
-        # than the full metric-laden topic string.
-        f"{_mkt_short} market size revenue commercial manufacturer {_years}",
-        f"{_mkt_short} industry company deployment commercial scale",
-        f"{topic} product manufacturer revenue commercial sales {_years}",
+        # Deployment evidence about the topic itself comes first. The scorer
+        # reads named operators, products and deployments as the primary TRL
+        # signal and a market-size page as no signal at all, yet this list
+        # used to open with the market-size query. The market-size queries
+        # now fill only slots left over: the deployment queries already
+        # return market-size pages (a retrieval probe on 2026-10-19 got two
+        # to three per query), so the market-evidence score keeps its input.
         f"{topic} company commercial deployment industry news",
-        f"{_mkt_short} market report investment startup {_years}",
+        f"{topic} product manufacturer revenue commercial sales {_years}",
+        f"{_mkt_short} industry company deployment commercial scale",
+        f"{_mkt_short} market size revenue commercial manufacturer {_years}",
         f"{topic} commercial scale production manufacturer press release",
+        f"{_mkt_short} market report investment startup {_years}",
         f"{topic} manufacturing commercialization company",
         f"{topic} government standards policy commercialization",
     ]
     if component_terms:
         component_market = [
-            f"{component} company product commercial deployment {_years}"
-            for component in component_terms
+            _component_market_query(component) for component in component_terms
         ]
         market_templates = (component_market + market_templates)[:8]
     market.extend(market_templates)
@@ -2563,6 +2631,7 @@ def _collect_domain(
     blocked_dois: set[str] | None = None,
     blocked_titles: set[str] | None = None,
     research_aliases: Sequence[str] = (),
+    query_limits: Mapping[str, int] | None = None,
 ) -> tuple[list[EvidenceSource], list[SearchAudit]]:
     prefix = {"academic": "A", "patent": "P", "market": "M"}[domain]
     accepted: list[EvidenceSource] = []
@@ -2601,8 +2670,14 @@ def _collect_domain(
         organic = response.get("organic", [])
         results = [item for item in organic if isinstance(item, dict)]
         audit = SearchAudit(domain=domain, query=query, result_count=len(results))
+        query_limit = (query_limits or {}).get(query)
         for result in results[:_SERPER_MAX_RESULTS_PER_QUERY]:
             if len(accepted) >= maximum_sources:
+                break
+            if query_limit is not None and len(audit.accepted_source_ids) >= query_limit:
+                audit.rejected_reasons.append(
+                    f"query source limit reached ({query_limit}); later results not read"
+                )
                 break
             # Use a stable placeholder; the real ID is assigned only when the
             # source is confirmed accepted so deferred sources never get the
@@ -3431,6 +3506,7 @@ def collect_source_collection(
             maximum_sources=maximum_sources,
             blocked_dois={src.doi for src in academic if src.doi is not None},
             blocked_titles={src.title for src in academic},
+            query_limits=_market_query_limits(query_map["market"], plan.components),
         )
     except SourceCollectionError as exc:
         # Losing the market domain used to lose the whole run, including the
