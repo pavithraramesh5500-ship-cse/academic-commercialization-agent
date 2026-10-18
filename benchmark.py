@@ -189,6 +189,25 @@ def _slug(topic: str) -> str:
     return topic.lower().replace(" ", "-")[:45].rstrip("-")
 
 
+def _crew_inputs(source_collection) -> dict:
+    """The kickoff inputs production builds, for a run with no decision context.
+
+    pipeline_worker merges source_collection.crew_inputs() with the decision
+    placeholders that the Writer and Reviewer templates require. This runner
+    took only the first part. From the day Decision Context was added, every
+    live benchmark run therefore failed at kickoff with "Missing required
+    template variable 'decision_context_json'", and no test noticed, because
+    none runs a real crew. A benchmark topic is an orientation run, so the
+    placeholders come from an empty DecisionContext, as they do in production
+    when none is supplied.
+    """
+    from academic_agent.run_spec import DecisionContext
+
+    inputs = source_collection.crew_inputs()
+    inputs.update(DecisionContext().crew_inputs())
+    return inputs
+
+
 def _run_dir(num: str, topic: str, rep: int = 1, *, root: Path | None = None) -> Path:
     """Directory for one execution of one topic.
 
@@ -397,7 +416,7 @@ def run_topic(
         # away, because the per-agent token usage lives on it and is only
         # readable after kickoff returns.
         crew_obj = AcademicAgent(source_collection).crew()
-        result = crew_obj.kickoff(inputs=source_collection.crew_inputs())
+        result = crew_obj.kickoff(inputs=_crew_inputs(source_collection))
 
         tasks_output = getattr(result, "tasks_output", None) or []
 
