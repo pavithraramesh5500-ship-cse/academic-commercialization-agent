@@ -1,6 +1,6 @@
 # Current evidence status
 
-Current ledger, updated 2026-10-11. The initial documentation consolidation
+Current ledger, updated 2026-10-18. The initial documentation consolidation
 used public main `0fdaa76a107cf034c16c1ffa6e3ae623e4c63fe2` on 2026-09-05;
 its dated baseline is historical, not the identity of every later entry.
 This page separates implemented contracts from observed behaviour and claims
@@ -193,6 +193,18 @@ production incident rates or improved report accuracy. See the
 [maintenance record](results-2026-09-06-maintenance-readiness-query-audit.md).
 
 ## Main evaluation ledger
+
+**Held-out TRL calibration (2026-10-18).** Ten topics never run before, with
+ranges fixed from external evidence before any run. Batch `heldout-trl-v1-c`
+ran `qwen3.7-plus`, the production model since that date. **21/30 runs fell in
+range**, which is the registered "supported" threshold. Scores were
+compressed, though: only 4, 6 and 7 occurred, no run scored above 7, and
+misses leaned below the floor (6 of 9), a registered directional bias.
+Mature, deployed technologies (drone medical delivery, floating offshore
+wind) were under-scored, and fusion power was over-scored. A constant-7 scorer
+would reach 15/30 (exploratory). The 30-run baseline below remains
+the tuned calibration set. See the [result and limits](results-2026-10-18-heldout-trl-v1.md);
+the topics are now consumed.
 
 Test maintenance consolidates weak/repeated feature scenarios and checks actual
 launch/workflow commands. The canonical matrix cell now measures coverage in
