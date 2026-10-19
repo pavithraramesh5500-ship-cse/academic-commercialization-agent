@@ -106,9 +106,15 @@ Seven of ten topics met their TRL range in all three runs.
 **Held-out check.** On ten new topics with ranges fixed from external evidence
 before any run (`qwen3.7-plus`, 2026-10-18), **21/30 runs fell in range**, the
 pre-registered "supported" threshold. Scores were compressed toward 7, though:
-no run scored above 7, so mature, deployed technologies were under-scored. Treat
-TRL as a coarse signal, not a fine-grained one. See the
+no run scored above 7, so mature, deployed technologies were under-scored. See the
 [held-out result](docs/results-2026-10-18-heldout-trl-v1.md).
+
+A second held-out cohort ran on 2026-10-19 with `qwen3.8-max` and the revised
+market retrieval. **25/30 runs fell in range**, and 11 runs scored 8–9 on
+proven technologies. Low-maturity topics were not inflated, though the two
+lowest ones were scored below their floor. The topics and the model also
+changed, so the improvement is not attributed to any single change. Treat TRL
+as a coarse signal. See the [v2 result](docs/results-2026-10-19-heldout-trl-v2.md).
 
 Other completed evidence:
 

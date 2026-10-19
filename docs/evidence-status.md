@@ -194,9 +194,18 @@ production incident rates or improved report accuracy. See the
 
 ## Main evaluation ledger
 
+**Held-out TRL calibration v2 (2026-10-19).** Ten further topics, registered
+before any run, measured with `qwen3.8-max` and the revised market retrieval
+(#213, #215). **25/30 runs fell in range**; 28 completed. Eleven runs scored
+8–9 on proven technologies, so v1's compression did not recur. No low-maturity
+topic was inflated, but all three misses that delivered a TRL fell below their
+floor (hyperloop, space-based solar power). Topics and model changed alongside
+retrieval, so no single cause is established. See the
+[result and limits](results-2026-10-19-heldout-trl-v2.md).
+
 **Held-out TRL calibration (2026-10-18).** Ten topics never run before, with
 ranges fixed from external evidence before any run. Batch `heldout-trl-v1-c`
-ran `qwen3.7-plus`, the production model since that date. **21/30 runs fell in
+ran `qwen3.7-plus`, the production model on that date. **21/30 runs fell in
 range**, which is the registered "supported" threshold. Scores were
 compressed, though: only 4, 6 and 7 occurred, no run scored above 7, and
 misses leaned below the floor (6 of 9), a registered directional bias.
