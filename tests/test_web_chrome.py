@@ -57,3 +57,12 @@ def test_component_styles_take_colours_from_tokens():
         css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
         css = re.sub(r'url\("data:image/svg\+xml[^"]*"\)', "", css)
         assert not re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", css), name
+
+
+def test_toasts_never_take_a_click():
+    """Text-only toasts stacked over a phone's short report must not block it."""
+    css = (ROOT / "web/static/css/workbench.css").read_text(encoding="utf-8")
+    rule = re.search(r"\n\.toast \{(.*?)\n\}", css, re.S).group(1)
+    assert "pointer-events: none;" in rule
+    assert "<button" not in (ROOT / "web/static/js/app.js").read_text(encoding="utf-8").split(
+        "function toast(", 1)[1].split("\n}\n", 1)[0]
