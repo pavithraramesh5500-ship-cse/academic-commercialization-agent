@@ -1210,6 +1210,70 @@ class MarketEstimateReleaseTests(TestCase):
                 self.assertEqual(self._classify(title, link).source_type, "reputable_news")
 
 
+class SectorAndEncyclopediaSourceTests(TestCase):
+    """Sector bodies are admitted; an encyclopedia entry is low credibility and capped."""
+
+    def _source(self, title: str, link: str):
+        source, reason = _web_source(
+            {"title": title, "link": link, "snippet": _LONG_MARKET_SNIPPET},
+            "M1", "market", date(2026, 10, 1), lambda url: (True, ""),
+        )
+        self.assertIsNotNone(source, reason)
+        return source
+
+    def test_wikipedia_is_a_low_credibility_tertiary_source(self):
+        source = self._source("Floating offshore wind - Wikipedia",
+                              "https://en.wikipedia.org/wiki/Floating_wind_turbine")
+        self.assertEqual((source.source_type, source.credibility_tier), ("other", "low"))
+        self.assertIn("tertiary", source.credibility_reason)
+
+    def test_sector_bodies_and_trade_press_are_admitted(self):
+        cases = (
+            ("https://world-nuclear.org/information-library/small-reactors", "research_institute"),
+            ("https://ieefa.org/resources/small-modular-reactors", "research_institute"),
+            ("https://www.carbonherald.com/top-direct-air-capture-companies", "reputable_news"),
+            ("https://www.beckershospitalreview.com/drone-delivery-hospitals", "reputable_news"),
+        )
+        for link, expected in cases:
+            with self.subTest(link=link):
+                self.assertEqual(self._source("Sector deployment overview", link).source_type, expected)
+
+    def test_social_networks_stay_blocked(self):
+        source, reason = _web_source(
+            {"title": "Drone delivery video", "link": "https://www.youtube.com/watch?v=abc",
+             "snippet": _LONG_MARKET_SNIPPET},
+            "M1", "market", date(2026, 10, 1), lambda url: (True, ""),
+        )
+        self.assertIsNone(source)
+        self.assertIn("blocked or not approved", reason)
+
+    def test_one_encyclopedia_entry_per_market_collection(self):
+        from academic_agent.source_pipeline import _collect_domain
+
+        def search(query: str) -> dict:
+            return {"organic": [
+                {"title": f"Test commercialization topic article {i} - Wikipedia",
+                 "link": f"https://en.wikipedia.org/wiki/Test_commercialization_{i}",
+                 "snippet": _LONG_MARKET_SNIPPET}
+                for i in range(1, 4)
+            ] + [
+                {"title": f"Test commercialization operator update {i}",
+                 "link": f"https://www.reuters.com/technology/operator-{i}",
+                 "snippet": _LONG_MARKET_SNIPPET}
+                for i in range(1, 4)
+            ]}
+
+        sources, audits = _collect_domain(
+            "market", ["q"], search, MatchingCrossref(), lambda url: (True, ""),
+            date(2026, 10, 1), "Test commercialization topic",
+            minimum_sources=0, maximum_sources=4,
+        )
+        hosts = [str(s.url) for s in sources]
+        self.assertEqual(sum("wikipedia.org" in h for h in hosts), 1)
+        self.assertEqual(len(sources), 4)
+        self.assertTrue(any("encyclopedia cap" in r for a in audits for r in a.rejected_reasons))
+
+
 class AuthorityQueryPlanningTests(TestCase):
     """Clinical-product searches must ask authority systems directly."""
 

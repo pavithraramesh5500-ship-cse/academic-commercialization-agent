@@ -198,6 +198,13 @@ _NONPROFIT_RESEARCH_DOMAINS = {
     "seia.org",              # Solar Energy Industries Association (US)
     "solarpowereurope.org",  # SolarPower Europe
     "solarenergyuk.net",     # Solar Energy UK
+    # Sector bodies that were rejected as unapproved on the 2026-10-18 held-out
+    # runs while naming the operators those topics' anchors rely on.
+    "world-nuclear.org",              # World Nuclear Association
+    "fusionindustryassociation.org",  # Fusion Industry Association
+    "dnastoragealliance.org",         # DNA Data Storage Alliance (SNIA)
+    "catf.us",                        # Clean Air Task Force
+    "ore.catapult.org.uk",            # Offshore Renewable Energy Catapult (UK)
 }
 _THINK_TANK_DOMAINS = {
     "itif.org",          # Information Technology and Innovation Foundation
@@ -208,7 +215,16 @@ _THINK_TANK_DOMAINS = {
     "csis.org",          # Center for Strategic and International Studies
     "chathamhouse.org",  # Chatham House
     "piie.com",          # Peterson Institute for International Economics
+    "ieefa.org",         # Institute for Energy Economics and Financial Analysis
+    "worldnuclearreport.org",  # World Nuclear Industry Status Report (independent)
 }
+# A tertiary source: it names operators and deployment dates that market pages
+# omit, but cites rather than originates them. It was blocked with the social
+# networks from the first pipeline, without a recorded failure. On the
+# 2026-10-18 held-out runs it was the only result naming the floating offshore
+# wind farms (Hywind, Kincardine, WindFloat) that topic's anchor rests on.
+# Admitted at low credibility and at most _MARKET_ENCYCLOPEDIA_SOFT_CAP per run.
+_ENCYCLOPEDIA_DOMAINS = {"wikipedia.org"}
 _PATENT_HOSTS = {
     "patents.google.com",
     "patentscope.wipo.int",
@@ -423,6 +439,11 @@ _INDUSTRY_NEWS_DOMAINS = {
     "agfundernews.com",
     "foodnavigator.com",
     "fooddive.com",
+    # Carbon removal and healthcare / medical-device trade press
+    "carbonherald.com",
+    "beckershospitalreview.com",
+    "beckersasc.com",
+    "mddionline.com",
 }
 _CONSULTING_RESEARCH_DOMAINS = {
     "mckinsey.com",      # McKinsey & Company
@@ -494,7 +515,6 @@ _BLOCKED_MARKET_DOMAINS = {
     "reddit.com",
     "tiktok.com",
     "twitter.com",
-    "wikipedia.org",
     "x.com",
     "youtu.be",
     "youtube.com",
@@ -595,6 +615,9 @@ _MARKET_INSTITUTIONAL_SOFT_CAP = 3
 # Market domain: accept at most this many market_report sources before deferring
 # extras, so company_disclosure / reputable_news sources have a chance to fill slots.
 _MARKET_REPORT_SOFT_CAP = 4
+# Market domain: one encyclopedia entry adds the named deployments; more would
+# trade primary evidence for a tertiary summary.
+_MARKET_ENCYCLOPEDIA_SOFT_CAP = 1
 # Maximum Serper results processed per query; limits first-query slot exhaustion
 # so subsequent queries in the same domain have a chance to contribute sources.
 _SERPER_MAX_RESULTS_PER_QUERY = 8
@@ -1699,6 +1722,13 @@ def _market_source_profile(
         return None
     if _host_matches(host, _ACADEMIC_PUBLISHER_DOMAINS):
         return None
+    if _host_matches(host, _ENCYCLOPEDIA_DOMAINS):
+        return (
+            "other",
+            "low",
+            "Encyclopedia entry (tertiary source): useful for named operators and "
+            "deployment history; verify each claim against the primary sources it cites.",
+        )
     if _host_matches(host, _AUTHORITATIVE_RESEARCH_DOMAINS):
         return (
             "research_institute",
@@ -2650,6 +2680,7 @@ def _collect_domain(
     _institutional_accepted = 0
     _authority_categories_accepted: set[str] = set()
     _market_report_accepted = 0
+    _encyclopedia_accepted = 0
     _INSTITUTIONAL_TYPES = frozenset(("research_institute", "government"))
     excluded_dois = {
         doi.lower()
@@ -2828,6 +2859,17 @@ def _collect_domain(
                         )
                         continue
                     _market_report_accepted += 1
+                elif _host_matches(
+                    (urlsplit(str(source.url)).hostname or "") if source.url else "",
+                    _ENCYCLOPEDIA_DOMAINS,
+                ):
+                    if _encyclopedia_accepted >= _MARKET_ENCYCLOPEDIA_SOFT_CAP:
+                        _deferred.append(source)
+                        audit.rejected_reasons.append(
+                            f"deferred (encyclopedia cap): {source.title!r}"
+                        )
+                        continue
+                    _encyclopedia_accepted += 1
             source.source_id = f"{prefix}{len(accepted) + 1}"
             accepted.append(source)
             audit.accepted_source_ids.append(source.source_id)
