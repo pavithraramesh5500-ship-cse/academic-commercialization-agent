@@ -115,6 +115,8 @@ proven technologies. Low-maturity topics were not inflated, though the two
 lowest ones were scored below their floor. The topics and the model also
 changed, so the improvement is not attributed to any single change. Treat TRL
 as a coarse signal. See the [v2 result](docs/results-2026-10-19-heldout-trl-v2.md).
+The public deployment has since moved to the smaller `qwen3.8-27b`, which
+neither held-out cohort measured.
 
 Other completed evidence:
 

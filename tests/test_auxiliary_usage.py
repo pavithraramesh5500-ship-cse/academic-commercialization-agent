@@ -130,7 +130,7 @@ def test_unknown_model_and_legacy_or_corrupt_sidecar_are_not_empty_success(tmp_p
     assert broken.summary()["record_state"] == "write_failed" and path.read_bytes() == before
 
 
-@pytest.mark.parametrize("model", ["qwen3.7-plus", "qwen3.8-max"])
+@pytest.mark.parametrize("model", ["qwen3.7-plus", "qwen3.8-max", "qwen3.8-27b"])
 def test_production_qwen_models_are_known_helper_identities(model, tmp_path):
     """Helper calls on the current production models must not be recorded as
     unknown-model observations with no tokens."""

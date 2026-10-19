@@ -24,7 +24,9 @@ uv sync
 ```
 
 For Qwen, explicitly set `LLM_PROVIDER=qwen`, `DASHSCOPE_API_KEY` and
-`QWEN_MODEL`. The public deployment uses `qwen3.8-max` (since 2026-10-18); an
+`QWEN_MODEL`. The public deployment uses `qwen3.8-27b` (since 2026-10-19;
+`qwen3.8-max` from 2026-10-18). Both accept the pipeline's JSON Object output
+with thinking disabled. Held-out v2 measured `qwen3.8-max`, not the 27B model. An
 unset `QWEN_MODEL` falls back to the code default `qwen3.5-plus`, or to
 `OPENAI_MODEL_NAME` when that is set, so set it explicitly. The built-in China-region compatible endpoint is
 `https://dashscope.aliyuncs.com/compatible-mode/v1`; operators may override
