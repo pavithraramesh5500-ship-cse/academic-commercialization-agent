@@ -364,6 +364,16 @@ class Qwen35PlusPricingTests(TestCase):
             # Unknown cache pricing is charged at the full input rate.
             self.assertEqual(price.cached, price.input)
 
+    def test_qwen38_27b_is_priced_at_the_higher_official_or_listed_rate(self):
+        """Production moved to qwen3.8-27b on 2026-10-19; unpriced, every run
+        would read "at least $X; unpriced" and the soft stop could not apply."""
+        with _clean_env():
+            small = price_for("qwen3.8-27b")
+        self.assertEqual((small.input, small.cached, small.output), (0.52, 0.52, 3.20))
+        self.assertIn("upper bound", small.basis)
+        self.assertIn("2026-10-19", small.basis)
+        self.assertNotIn(PRICES_AS_OF, small.basis)
+
     def test_qwen_cached_tokens_are_a_subset_of_prompt_input(self):
         """DashScope follows the OpenAI nested cached-token convention.
 
