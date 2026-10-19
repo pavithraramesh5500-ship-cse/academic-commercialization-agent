@@ -7,6 +7,7 @@ template family, not a claim about the page: "market-size titled" is a title
 pattern, counted as a lower bound in the 2026-10-18 diagnosis.
 
     uv run python -m scripts.audits.market_query_origin outputs/benchmark-runs/<batch>
+    uv run python -m scripts.audits.market_query_origin <batch> --cohort evals/<cohort>/cohort.json
 """
 
 from __future__ import annotations
@@ -90,11 +91,38 @@ def summarise(batch: Path) -> dict:
     }
 
 
+def names_entity(text: str, entities: list[str]) -> bool:
+    """Case-sensitive whole-token mention, the rule registered for held-out v2."""
+    return any(re.search(rf"(?<![A-Za-z0-9]){re.escape(e)}(?![A-Za-z0-9])", text) for e in entities)
+
+
+def entity_coverage(batch: Path, cohort: Path) -> dict[str, list[list[int]]]:
+    """Per case, [entity-naming market sources, market sources] for each run.
+
+    Entities are the cohort's anchor_entities, fixed before the batch ran.
+    """
+    cases = json.loads(cohort.read_text(encoding="utf-8"))["cases"]
+    coverage: dict[str, list[list[int]]] = {}
+    for case in cases:
+        rows = []
+        for path in sorted(batch.glob(f"{case['id']}-*/validated_sources.json")):
+            sources = json.loads(path.read_text(encoding="utf-8"))["market_sources"]
+            rows.append([sum(names_entity(f"{s['title']} {s['evidence_summary']}",
+                                          case["anchor_entities"]) for s in sources), len(sources)])
+        coverage[case["id"]] = rows
+    return coverage
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("batch", type=Path, help="a benchmark batch directory")
+    parser.add_argument("--cohort", type=Path,
+                        help="also report anchor-entity coverage against this cohort file")
     args = parser.parse_args(argv)
-    print(json.dumps(summarise(args.batch), indent=2, ensure_ascii=False))
+    report = summarise(args.batch)
+    if args.cohort:
+        report["anchor_entity_coverage"] = entity_coverage(args.batch, args.cohort)
+    print(json.dumps(report, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
