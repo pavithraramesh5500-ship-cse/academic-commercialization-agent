@@ -778,6 +778,11 @@ document.addEventListener("keydown", (e) => {
 
 /* ── Capacity ──────────────────────────────────────────────────────── */
 
+// The last /health reading, kept so a language switch can relabel the
+// capacity line at once instead of leaving it in the old language until the
+// next poll. null until the first reading; "offline" after a failed one.
+let capacityReading = null;
+
 async function refreshCapacity() {
   try {
     const {
@@ -794,18 +799,29 @@ async function refreshCapacity() {
       dot.dataset.busy = String(i < active_paid_operations);
       dots.append(dot);
     }
-    $("#capacity-label").textContent =
-      `${active_paid_operations}/${max_concurrent} ${t("running_label")}`;
-    // Someone who uploads an unpublished paper is entitled to know how long it
-    // stays here — and a deletion nobody was told about reads as data loss
-    // rather than as policy. Shown on the capacity line rather than in a
-    // dialog because it is a standing fact about the deployment, not an event.
-    $("#capacity-label").title = retention_days
-      ? t("retention_note").replace("{days}", retention_days)
-      : t("retention_forever");
+    capacityReading = { active_paid_operations, max_concurrent, retention_days };
   } catch {
-    $("#capacity-label").textContent = t("offline");
+    capacityReading = "offline";
   }
+  paintCapacityLabel();
+}
+
+function paintCapacityLabel() {
+  if (capacityReading === null) return;
+  const label = $("#capacity-label");
+  if (capacityReading === "offline") {
+    label.textContent = t("offline");
+    return;
+  }
+  const { active_paid_operations, max_concurrent, retention_days } = capacityReading;
+  label.textContent = `${active_paid_operations}/${max_concurrent} ${t("running_label")}`;
+  // Someone who uploads an unpublished paper is entitled to know how long it
+  // stays here — and a deletion nobody was told about reads as data loss
+  // rather than as policy. Shown on the capacity line rather than in a
+  // dialog because it is a standing fact about the deployment, not an event.
+  label.title = retention_days
+    ? t("retention_note").replace("{days}", retention_days)
+    : t("retention_forever");
 }
 
 /* ── Access gate ───────────────────────────────────────────────────────
@@ -1054,6 +1070,7 @@ langSelect.value = i18n.language();
 langSelect.addEventListener("change", () => {
   i18n.setLanguage(langSelect.value);
   paintPaidReceipt();
+  paintCapacityLabel();
   topic.placeholder = t("topic_placeholder");
   // Re-render whatever is on screen so switching mid-run does not leave a
   // half-translated pane behind.
