@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import threading
+import time
 from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
@@ -550,11 +551,28 @@ def test_thread_start_failure_rolls_back_registration(monkeypatch):
     assert all(not thread.is_alive() for thread in attempts)
 
 
+def _locator_threads_exit(timeout=5.0):
+    """Admission stays closed until the previous worker thread has exited.
+
+    That is the design (run() refuses while any registered thread is alive),
+    and the reply is settled just before the thread returns. On a loaded
+    machine the next request can arrive inside that window and get 429, so
+    wait for the actual exit, as the slot contract states, before asserting.
+    """
+    deadline = time.monotonic() + timeout
+    while any(thread.name == "saved-source-locator" and thread.is_alive()
+              for thread in threading.enumerate()):
+        assert time.monotonic() < deadline, "Locator worker thread did not exit"
+        time.sleep(0.005)
+
+
 def test_slot_releases_after_success_and_failure():
     callback = Mock(side_effect=[RuntimeError("private"), select({}), select({})])
     with TestClient(make_app(selector=callback)) as client:
         assert_error(client.post(URL, json={"question": "Where?"}), 503, "execution_unavailable")
+        _locator_threads_exit()
         assert client.post(URL, json={"question": "Where?"}).status_code == 200
+        _locator_threads_exit()
         assert client.post(URL, json={"question": "Where?"}).status_code == 200
     assert callback.call_count == 3
 
