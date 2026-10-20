@@ -277,3 +277,8 @@ Kubernetes 本身不能解决这些缺口。
 
 作者：[shuxiachai](https://github.com/shuxiachai)。
 更多项目与实践见 [GitHub 个人主页](https://github.com/shuxiachai)。
+
+## 许可证
+
+本项目采用 [MIT 许可证](LICENSE)。提交的贡献同样按 MIT 许可，详见
+[CONTRIBUTING.md](CONTRIBUTING.md#pull-requests-and-privacy)。

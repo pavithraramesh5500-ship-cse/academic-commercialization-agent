@@ -136,6 +136,10 @@ limitations and validation. Commit messages are deliberately substantive and
 in English; do not add Co-Authored-By or tool-signature lines. Preserve
 unrelated worktree changes and raw reviewer files.
 
+The project is licensed under the [MIT License](LICENSE). By submitting a
+pull request you agree that your contribution is licensed under the same
+terms, and that you have the right to submit it under them.
+
 This public repository must not receive credentials, private review packets,
 first-person resume notes or private run capability URLs. Resume notes are a
 separate private repository. A paid test, production restart, publication of

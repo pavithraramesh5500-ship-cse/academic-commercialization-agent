@@ -325,6 +325,11 @@ Current controls and wording may differ; the result screen is shown above.
 Created by [shuxiachai](https://github.com/shuxiachai).
 Explore [more projects on the author's GitHub profile](https://github.com/shuxiachai).
 
+## License
+
+[MIT](LICENSE). Contributions are accepted under the same license; see
+[CONTRIBUTING.md](CONTRIBUTING.md#pull-requests-and-privacy).
+
 <a id="chinese"></a>
 
 For Chinese documentation, open [README.zh-CN.md](README.zh-CN.md).
