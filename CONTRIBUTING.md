@@ -56,6 +56,16 @@ installed packages. CI still runs serially: on a saturated four-core runner
 a few timing-sensitive concurrency tests fail intermittently in parallel, so
 confirm a parallel-only failure with a serial rerun before chasing it.
 
+Tests of closed experiments, audits and probes are marked `experiment`
+([list](tests/experiment_tests.txt)); they take about 80% of suite time for
+code the app and pipeline never import. `uv run pytest -m "not experiment"`
+runs the rest in a couple of minutes. On a pull request, the Ubuntu/Python
+3.12 cell runs everything and the other cells skip `experiment`; the weekly
+[full-suite workflow](.github/workflows/full-suite.yml) runs everything on
+every cell. Add a new test of experiment code to the list;
+`tests/test_experiment_suite.py` rejects a listed file that tests code the
+app or pipeline uses. An unlisted test simply runs everywhere.
+
 - Run the complete suite before editing and after the fix.
 - Do not weaken assertions or add skips to make a failure disappear.
 - Read the actual `UserWarning` before acting. A network-leak warning means

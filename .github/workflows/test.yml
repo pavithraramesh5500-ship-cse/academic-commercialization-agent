@@ -50,14 +50,19 @@ jobs:
         # Serial on purpose. With -n auto (#228) about half of the CI runs
         # hit a timing-sensitive concurrency test on a saturated runner;
         # re-enable it once those tests are parallel-safe.
-        run: uv run --python ${{ matrix.python-version }} pytest tests/ -v --tb=short --durations=40
+        # These cells skip tests of closed experiments (marker `experiment`,
+        # tests/experiment_tests.txt): about 80% of suite time, for code the
+        # app and pipeline never import. The coverage cell below still runs
+        # them on every PR, and full-suite.yml runs everything on every cell
+        # weekly.
+        run: uv run --python ${{ matrix.python-version }} pytest tests/ -m "not experiment" -v --tb=short --durations=40
 
       - name: Run tests with the measured coverage floor
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         # The canonical cell measures coverage during its only full-suite run.
         # A fresh full run measured 87% on 2026-08-24; the unchanged 85% floor
-        # leaves room for platform-specific defensive branches. Other cells
-        # still run every test, without redefining this single-platform metric.
+        # leaves room for platform-specific defensive branches. This cell runs
+        # every test, experiments included, so the metric is unchanged.
         # sys.monitoring (Python 3.12+) measures the same line coverage as the
         # trace-function core at a fraction of its overhead.
         env:
