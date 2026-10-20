@@ -4,6 +4,26 @@ Read [AGENTS.md](AGENTS.md) first. It is a decision index: several seemingly
 obvious changes have already been rejected on measured evidence. Use
 [the documentation map](docs/README.md) for current guides and historical results.
 
+For a first contribution, the map below is enough; read AGENTS.md before
+changing pipeline, scoring or experiment code.
+
+## Where newcomers can work
+
+Look for issues labelled
+[`good first issue`](https://github.com/shuxiachai/academic-commercialization-agent/labels/good%20first%20issue)
+or [`help wanted`](https://github.com/shuxiachai/academic-commercialization-agent/labels/help%20wanted).
+You need no API keys: the test suite and the browser smokes make no paid
+requests.
+
+| | Where |
+|---|---|
+| **Good for a first PR** | The main web client (`web/index.html`, `web/samples.html`, `web/static/` except the files in the last row; new UI strings go in a small module of their own, like `web/static/js/samples_i18n.js`); `ui/` readers and PDF export; current guides (`README*`, `CONTRIBUTING.md`, `docs/operating-guide.md`, `docs/README.md`); new tests in `tests/` and `e2e/`; new tools under `scripts/` |
+| **Open an issue first** | Production pipeline and retrieval (`src/academic_agent/crew.py`, `source_pipeline.py`, `evidence.py`, `config/`); API access, BYOK and billing boundaries in `api/`; anything that changes scores, prompts or providers |
+| **Do not change** | `web/static/js/i18n.js`, `web/static/js/result.js`, `tests/js/source_browser_contract.mjs` and `AGENTS.md` (frozen experiments hash their bytes); the experimental pages `web/saved-source-*/` and `web/source-locator/`; the root experiment scripts and the experimental modules in `src/academic_agent/` (their paths and bytes are bound the same way); dated documents `docs/prereg-*`, `docs/results-*`, `docs/errata-*`, `docs/protocol-*`; fixtures in `tests/fixtures/`, `evals/` and `benchmark_fixtures/`. Touch `pyproject.toml` and `uv.lock` only as far as your change needs |
+
+If a change you need falls in the last row, open an issue and explain why;
+the frozen material belongs to closed studies whose results depend on it.
+
 ## Setup
 
 ```bash
