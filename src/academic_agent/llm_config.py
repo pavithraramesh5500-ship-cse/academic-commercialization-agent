@@ -29,21 +29,16 @@ _PROVIDER_KEY_NAMES = {
     "anthropic": ("ANTHROPIC_API_KEY",),
 }
 
-# Qwen3.5 Plus is exposed through Alibaba Model Studio's OpenAI-compatible
-# chat endpoint, but remains a logical provider here. That distinction lets
-# the API use the official DASHSCOPE_API_KEY name, pin a safe BYOK endpoint,
-# and apply provider-specific accounting without labelling the request OpenAI.
-_QWEN_MODEL = "qwen3.5-plus"
+# Qwen is exposed through Alibaba Model Studio's OpenAI-compatible chat
+# endpoint, but remains a logical provider here. That distinction lets the
+# API use the official DASHSCOPE_API_KEY name, pin a safe BYOK endpoint, and
+# apply provider-specific accounting without labelling the request OpenAI.
 _QWEN_API_BASE = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
-#: Model used when a provider is chosen without naming one: the operator sets
-#: none, or a BYOK visitor leaves the model field empty.
-DEFAULT_MODELS = {
-    "deepseek": "deepseek-chat",
-    "qwen": _QWEN_MODEL,
-    "openai": "gpt-4o",
-    "anthropic": "claude-sonnet-5",
-}
+# There is deliberately no default model. A built-in default silently ran
+# qwen3.5-plus whenever QWEN_MODEL went missing, long after production had
+# moved on, and a BYOK visitor's key was billed for a model they never named.
+# The operator sets the provider's model variable; a BYOK caller names one.
 
 # Providers that support response_format={"type": "json_object"}.
 # Anthropic does not — it relies on prompt instructions + guardrail validation.
@@ -76,11 +71,11 @@ def _detect_provider() -> str:
             return "qwen"
         return "openai"
     raise RuntimeError(
-        "No LLM API key found. Set one of:\n"
-        "  DEEPSEEK_API_KEY  -> DeepSeek  (default model: deepseek-chat)\n"
-        "  DASHSCOPE_API_KEY -> Qwen      (default model: qwen3.5-plus)\n"
-        "  ANTHROPIC_API_KEY -> Anthropic (default model: claude-sonnet-5)\n"
-        "  OPENAI_API_KEY    -> OpenAI    (default model: gpt-4o)\n"
+        "No LLM API key found. Set one key and its model:\n"
+        "  DEEPSEEK_API_KEY  -> DeepSeek  (model: DEEPSEEK_MODEL)\n"
+        "  DASHSCOPE_API_KEY -> Qwen      (model: QWEN_MODEL)\n"
+        "  ANTHROPIC_API_KEY -> Anthropic (model: ANTHROPIC_MODEL)\n"
+        "  OPENAI_API_KEY    -> OpenAI    (model: OPENAI_MODEL)\n"
         "Or set LLM_PROVIDER explicitly to override auto-detection."
     )
 
@@ -131,28 +126,31 @@ def resolve_provider_config(
     Missing/partial credentials fail before construction, never fall back to
     the operator's account. No dotenv reload may undo the worker's sentinels.
 
-    ``model`` lets an explicit BYOK caller choose the model for their own
-    key. It is accepted only with explicit credentials and only in the
-    BYOK_MODEL_PATTERN shape; the endpoint stays the provider's.
+    ``model`` is the model for an explicit BYOK caller's own key, and is
+    required with explicit credentials, in the BYOK_MODEL_PATTERN shape; the
+    endpoint stays the provider's. The operator's model comes from the
+    provider's model variable. Neither has a fallback: a missing model fails
+    here, before any request, rather than running a built-in one.
     """
     explicit = provider is not None or api_key is not None
     if explicit and (not provider or not api_key or not api_key.strip()):
         raise RuntimeError("Provider and non-empty API key must be supplied together.")
     if model is not None and not explicit:
         raise RuntimeError("A model can only be chosen together with explicit credentials.")
+    if explicit and model is None:
+        raise RuntimeError("A model must be named together with explicit credentials.")
     if model is not None and not BYOK_MODEL_PATTERN.fullmatch(model):
         raise RuntimeError("Model must be a plain model identifier.")
     selected = provider.lower().strip() if explicit else _detect_provider()
-    defaults = {
-        "deepseek": (DEFAULT_MODELS["deepseek"], "https://api.deepseek.com"),
-        "qwen": (DEFAULT_MODELS["qwen"], _QWEN_API_BASE),
-        "openai": (DEFAULT_MODELS["openai"], "https://api.openai.com/v1"),
-        "anthropic": (DEFAULT_MODELS["anthropic"], "https://api.anthropic.com"),
+    bases = {
+        "deepseek": "https://api.deepseek.com",
+        "qwen": _QWEN_API_BASE,
+        "openai": "https://api.openai.com/v1",
+        "anthropic": "https://api.anthropic.com",
     }
-    if selected not in defaults:
+    if selected not in bases:
         raise RuntimeError("Unknown LLM_PROVIDER; supported: " + ", ".join(_SUPPORTED_PROVIDERS))
-    model_default, base = defaults[selected]
-    model = model or model_default
+    base = bases[selected]
     key = api_key if explicit else _configured_api_key(selected)
     if not explicit:
         names = {
@@ -162,7 +160,9 @@ def resolve_provider_config(
             "anthropic": (("ANTHROPIC_MODEL",), ("ANTHROPIC_API_BASE",)),
         }
         model_names, base_names = names[selected]
-        model = next((os.environ[n] for n in model_names if os.getenv(n)), model)
+        model = next((os.environ[n].strip() for n in model_names if os.getenv(n, "").strip()), None)
+        if model is None:
+            raise RuntimeError(f"No model configured for {selected}: set {' or '.join(model_names)}.")
         base = next((os.environ[n] for n in base_names if os.getenv(n)), base)
     if selected == "deepseek" and model.startswith("deepseek/"):
         model = model.split("/", 1)[1]
@@ -203,7 +203,7 @@ def validate_llm_configuration() -> str:
 def _qwen_additional_params() -> dict[str, object]:
     """Return a fresh OpenAI SDK extension body for Qwen JSON calls.
 
-    Qwen3.5 Plus enables thinking by default. Alibaba's Chat Completions
+    Qwen3 models enable thinking by default. Alibaba's Chat Completions
     contract requires non-thinking mode for reliable JSON Object output, and
     ``enable_thinking`` is not an OpenAI SDK keyword. CrewAI 1.14.7 expands
     ``additional_params`` into ``chat.completions.create`` arguments, so the

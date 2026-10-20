@@ -26,14 +26,16 @@ uv sync
 For Qwen, explicitly set `LLM_PROVIDER=qwen`, `DASHSCOPE_API_KEY` and
 `QWEN_MODEL`. The public deployment uses `qwen3.8-27b` (since 2026-10-19;
 `qwen3.8-max` from 2026-10-18). Both accept the pipeline's JSON Object output
-with thinking disabled. Held-out v2 measured `qwen3.8-max`, not the 27B model. An
-unset `QWEN_MODEL` falls back to the code default `qwen3.5-plus`, or to
-`OPENAI_MODEL_NAME` when that is set, so set it explicitly. The built-in China-region compatible endpoint is
+with thinking disabled. Held-out v2 measured `qwen3.8-max`, not the 27B model.
+There is no built-in default model (removed 2026-10-20; it was `qwen3.5-plus`).
+An unset `QWEN_MODEL` uses `OPENAI_MODEL_NAME` when that is set; otherwise
+readiness reports the missing variable and every run fails before its first
+model request. The same holds for each provider's model variable below. The built-in China-region compatible endpoint is
 `https://dashscope.aliyuncs.com/compatible-mode/v1`; operators may override
 `QWEN_API_BASE` for their account/region. The browser BYOK endpoint is fixed
 by the provider contract rather than accepting arbitrary visitor URLs.
 
-| Provider selector | Key | Optional model / endpoint |
+| Provider selector | Key | Required model, optional endpoint |
 |---|---|---|
 | `qwen` | `DASHSCOPE_API_KEY` | `QWEN_MODEL`, `QWEN_API_BASE` |
 | `deepseek` | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL`, `DEEPSEEK_API_BASE` |
@@ -617,8 +619,8 @@ into the operator environment or persisted in run artifacts. Empty sentinels
 prevent import-time dotenv loading from restoring operator keys. PDF extraction
 uses the same isolated credential contract.
 
-A BYOK visitor chooses the model for their own key (`llm_model`; empty means
-the provider default shown in the form). The name must be a plain identifier
+A BYOK visitor names the model for their own key (`llm_model`, required: there
+is no default, and the form shows only an example). The name must be a plain identifier
 (letters, digits and `. _ - :`). It fills only the selected provider's model
 variable, while the endpoint stays the provider's fixed one, so it cannot
 redirect the key. The operator's `QWEN_MODEL` never applies to a visitor's

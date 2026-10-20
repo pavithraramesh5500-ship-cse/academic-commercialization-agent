@@ -161,7 +161,7 @@ replace the placeholders locally; do not commit or share keys:
 ```dotenv
 LLM_PROVIDER=qwen
 DASHSCOPE_API_KEY=your-key
-QWEN_MODEL=qwen3.5-plus
+QWEN_MODEL=qwen3.8-27b
 QWEN_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1
 TAVILY_API_KEY=your-search-key
 ```

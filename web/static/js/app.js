@@ -1025,11 +1025,11 @@ function showGate(errorKey = null) {
       if (codeSubmit.disabled || finished) return;
       const provider = $("#byok-provider").value;
       const llmKey = $("#byok-llm-key").value.trim();
-      // Empty model means the provider's default, shown as the placeholder.
+      // Required, like the keys: there is no default model to fall back on.
       const model = $("#byok-model").value.trim();
       const search = $("#byok-search").value;
       const searchKey = $("#byok-search-key").value.trim();
-      if (!llmKey || !searchKey) return;
+      if (!llmKey || !model || !searchKey) return;
 
       try {
         api.setByok({ provider, llmKey, search, searchKey, ...(model ? { model } : {}) });

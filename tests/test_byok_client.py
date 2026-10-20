@@ -15,7 +15,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from academic_agent.llm_config import DEFAULT_MODELS
+from academic_agent import llm_config
+from api.models import BYOK_PROVIDERS
 
 _WEB = Path(__file__).resolve().parents[1] / "web" / "static" / "js"
 
@@ -94,14 +95,19 @@ class ByokClientTests(unittest.TestCase):
         self.assertEqual(self.out["payer_kept"]["value"]["serperKey"], "s")
 
 
-class DefaultModelParityTests(unittest.TestCase):
+class RequiredModelTests(unittest.TestCase):
 
-    def test_the_form_shows_the_defaults_the_server_uses(self):
-        """The placeholder tells a visitor what an empty field bills them for."""
+    def test_the_form_requires_a_model_and_only_suggests_one(self):
+        """No default model anywhere: the field is required, the example a hint."""
+        self.assertFalse(hasattr(llm_config, "DEFAULT_MODELS"))
         source = (_WEB / "byok_fields.js").read_text(encoding="utf-8")
-        block = re.search(r"DEFAULT_MODELS = \{(.*?)\};", source, re.S).group(1)
-        shown = dict(re.findall(r"(\w+):\s*\"([^\"]+)\"", block))
-        self.assertEqual(shown, DEFAULT_MODELS)
+        self.assertNotIn("DEFAULT_MODELS", source)
+        block = re.search(r"MODEL_EXAMPLES = \{(.*?)\};", source, re.S).group(1)
+        self.assertEqual(set(re.findall(r"(\w+):\s*\"[^\"]+\"", block)), set(BYOK_PROVIDERS))
+        index = (_WEB.parents[1] / "index.html").read_text(encoding="utf-8")
+        self.assertRegex(index, r'<input[^>]*id="byok-model"[^>]*\srequired\b')
+        app = (_WEB / "app.js").read_text(encoding="utf-8")
+        self.assertIn("if (!llmKey || !model || !searchKey) return;", app)
 
     def test_the_browser_model_check_matches_the_server_pattern(self):
         from academic_agent.llm_config import BYOK_MODEL_PATTERN

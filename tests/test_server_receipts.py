@@ -99,7 +99,8 @@ def test_byok_fingerprint_has_no_plain_credentials_and_lookup_is_capability_base
     client, launch, root = paid_api
     auth = headers(code=None)
     payload = {"topic": "Private BYOK input", "llm_provider": "qwen",
-               "llm_api_key": "offline-llm-secret", "serper_api_key": "offline-search-secret"}
+               "llm_api_key": "offline-llm-secret", "llm_model": "qwen3.8-27b",
+               "serper_api_key": "offline-search-secret"}
     first = client.post("/api/runs", headers=auth, json=payload)
     assert first.status_code == 202
     assert client.post("/api/runs", headers=auth, json=payload).json() == first.json()
