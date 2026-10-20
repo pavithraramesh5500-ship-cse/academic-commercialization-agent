@@ -14,8 +14,8 @@ _WORKFLOW = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "tes
 _PYTHON = "${{ matrix.python-version }}"
 _PLAIN_IF = "matrix.os != 'ubuntu-latest' || matrix.python-version != '3.12'"
 _COVERAGE_IF = "matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'"
-# -n auto runs the same complete suite across the runner's cores (pytest-xdist).
-_PLAIN_RUN = f"uv run --python {_PYTHON} pytest tests/ -n auto -v --tb=short --durations=40"
+# Serial until the timing-sensitive concurrency tests are parallel-safe.
+_PLAIN_RUN = f"uv run --python {_PYTHON} pytest tests/ -v --tb=short --durations=40"
 _COVERAGE_RUN = (
     f"{_PLAIN_RUN} --cov=src/academic_agent --cov=api --cov=ui "
     "--cov-report=term-missing --cov-fail-under=85"
