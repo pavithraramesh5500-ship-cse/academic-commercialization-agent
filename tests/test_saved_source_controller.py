@@ -91,8 +91,15 @@ def run(value, receipt_key=None, question=QUESTION, code=CODE):
     return asyncio.run(value.execute(receipt_key or key(), RUN_ID, question, code))
 
 
+# Upper bound for a scripted thread to reach or be released from its event.
+# Not a performance budget: these paths fsync receipts and ledgers, and with
+# the suite running in parallel on a Windows CI runner the same steps took
+# 10-27 s instead of 2-4 s. A wait that is never satisfied still fails.
+_SCRIPTED_WAIT = 30
+
+
 async def observed(event):
-    assert await asyncio.to_thread(event.wait, 5), "Worker did not reach the scripted event"
+    assert await asyncio.to_thread(event.wait, _SCRIPTED_WAIT), "Worker did not reach the scripted event"
 
 
 def test_real_load_projection_and_replay_preserve_all_frozen_fields(setup, monkeypatch):
@@ -260,12 +267,12 @@ def test_cancellation_before_admission_is_free_after_entry_keeps_ownership(setup
     def load(run_id):
         if stage == "loader":
             entered.set()
-            assert release.wait(5)
+            assert release.wait(_SCRIPTED_WAIT)
         return SavedSourceLoader(root)(run_id)
     def selected(request):
         if stage == "selector":
             entered.set()
-            assert release.wait(5)
+            assert release.wait(_SCRIPTED_WAIT)
         return callback(request)
     value = make(selected, load)
     receipt_key = key()
@@ -310,7 +317,7 @@ def test_cancelled_queued_startup_never_creates_intent_or_loader_thread(setup):
         asyncio.get_running_loop().set_default_executor(pool)
         def occupy():
             entered.set()
-            assert release.wait(5)
+            assert release.wait(_SCRIPTED_WAIT)
         occupied = asyncio.get_running_loop().run_in_executor(None, occupy)
         while not entered.is_set():
             await asyncio.sleep(0)
@@ -338,7 +345,7 @@ def test_revocation_while_loader_blocked_prevents_paid_entry(setup, monkeypatch)
     callback = Mock(side_effect=select)
     def load(run_id):
         entered.set()
-        assert release.wait(5)
+        assert release.wait(_SCRIPTED_WAIT)
         return SavedSourceLoader(root)(run_id)
     value = make(callback, load)
     async def scenario():
@@ -477,11 +484,11 @@ def test_thread_lease_byok_share_and_existing_inline_behavior(setup, monkeypatch
     def worker():
         runs.reserve_thread_paid_operation(owner=None, byok=True)
         entered.set()
-        assert release.wait(5)
+        assert release.wait(_SCRIPTED_WAIT)
     thread = threading.Thread(target=worker)
     thread.start()
     try:
-        assert entered.wait(5)
+        assert entered.wait(_SCRIPTED_WAIT)
         with pytest.raises(runs.ConcurrencyLimitReached), runs.reserve_inline_paid_operation(owner=None, byok=True):
             pytest.fail("BYOK share must count dedicated thread")
         with runs.reserve_inline_paid_operation(owner=access.owner_id(CODE), byok=False):
@@ -561,7 +568,7 @@ def test_duplicate_race_one_callback_charge_and_bounded_loader_threads(setup):
     callback = Mock(side_effect=select)
     def load(run_id):
         entered.set()
-        assert release.wait(5)
+        assert release.wait(_SCRIPTED_WAIT)
         return SavedSourceLoader(root)(run_id)
     value = make(callback, load)
     receipt_key = key()
@@ -615,7 +622,7 @@ def test_admitted_selector_blocks_actual_pdf_and_run_admission(setup):
     entered, release = threading.Event(), threading.Event()
     def callback(request):
         entered.set()
-        assert release.wait(5)
+        assert release.wait(_SCRIPTED_WAIT)
         return select(request)
     value = make(callback)
     async def scenario():
