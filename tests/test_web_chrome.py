@@ -33,6 +33,23 @@ def test_phone_menu_labels_exist_in_both_interface_languages():
     assert "chrome.js" not in (ROOT / "web/static/js/app.js").read_text(encoding="utf-8")
 
 
+def test_starter_topics_have_a_chinese_entry_for_every_button():
+    """A Chinese reader got English starters, and so English reports under "auto"."""
+    buttons = re.findall(r'<button type="button" class="starter" data-topic="([^"]+)">', INDEX)
+    source = (ROOT / "web/static/js/starters.js").read_text(encoding="utf-8")
+    table = source.split('"Simplified Chinese":', 1)[1].split("}", 1)[0]
+    chinese = re.findall(r'\["([^"]+)", "([^"]+)"\]', table)
+    assert len(buttons) == len(chinese) == 3
+    for text, topic in chinese:
+        assert re.search(r"[一-鿿]", text) and re.search(r"[一-鿿]", topic)
+    scripts = re.findall(r'<script type="module" src="/static/js/(\w+)\.js"></script>', INDEX)
+    assert scripts.index("starters") > scripts.index("app")
+    app = (ROOT / "web/static/js/app.js").read_text(encoding="utf-8")
+    # Rewriting data-topic is enough only while app.js reads it at click time.
+    assert "topic.value = btn.dataset.topic;" in app
+    assert "starters.js" not in app
+
+
 def test_dark_theme_redefines_every_colour_token():
     """A colour left out of the dark block would show a paper value on charcoal."""
     light_block = TOKENS.split("@media (prefers-color-scheme: dark)", 1)[0]

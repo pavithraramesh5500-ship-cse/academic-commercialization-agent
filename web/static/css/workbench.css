@@ -191,12 +191,26 @@
   text-overflow: ellipsis;
 }
 
+/* Admin view: the owner badge sits on a second line under the topic, so the
+   topic keeps the rail's full width (sidebar.js render()). */
+.runitem--owned { align-items: flex-start; }
+.runitem--owned .runitem__state { margin-top: 0.55em; }
+.runitem__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.runitem__text .runitem__label { flex: none; width: 100%; }
+
 /* Only ever rendered for an admin request (RunSummary.owner_label) — which
    code ran this, so a merged multi-code history stays legible instead of
    reading as one undifferentiated list. */
 .runitem__owner {
   flex-shrink: 0;
-  max-width: 96px;
+  max-width: 100%;
   padding: 1px var(--space-2);
   border-radius: var(--radius-full);
   background: var(--bg-overlay);
