@@ -155,3 +155,8 @@ documentation change is not that authorization.
 | Zero-provider browser journey | `e2e/browser_smoke.py` |
 
 The detailed boundary map is in [AGENTS.md](AGENTS.md#layout-and-boundary-specific-reading).
+
+New experiment runners, probes and audits belong under `scripts/` (offline
+audits in `scripts/audits/`), not at the repository root. Existing root
+runners stay where they are because their protocols bind paths and hashes;
+see the [repository map](docs/README.md#repository-map).

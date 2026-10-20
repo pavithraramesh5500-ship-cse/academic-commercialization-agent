@@ -19,6 +19,11 @@
 技术实现为 Python、CrewAI、FastAPI 和无需构建的 JavaScript 客户端。
 [从这里开始：文档与目录导航](docs/README.md) · [项目案例](docs/portfolio-case-study.md)
 
+**目录速览：**应用代码在 `src/academic_agent/`、`api/`、`web/` 和 `ui/`，测试在
+`tests/` 和 `e2e/`。根目录下的大量 Python 文件是基准测试命令和已冻结的实验运行器，
+其路径被实验协议锁定，因此不搬动；运行应用不需要它们。各目录说明见
+[目录地图](docs/README.md#repository-map)。
+
 ## 可以做什么
 
 - 输入研究主题或上传论文 PDF，选择报告语言与评分档位。

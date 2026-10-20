@@ -23,6 +23,12 @@ current model accuracy or an up-to-date market assessment.
 Built with Python, CrewAI, FastAPI and a build-free JavaScript client.
 [Start here: documentation and repository map](docs/README.md) · [Case study](docs/portfolio-case-study.md)
 
+**Finding your way around:** the application is `src/academic_agent/`, `api/`,
+`web/` and `ui/`; tests are in `tests/` and `e2e/`. The many Python files at the
+root are benchmark commands and frozen experiment runners whose protocols bind
+their paths, so they stay put; none is needed to run the app. See the
+[repository map](docs/README.md#repository-map) for every directory.
+
 <a id="english"></a>
 
 ## What it does
