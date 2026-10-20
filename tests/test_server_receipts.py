@@ -21,6 +21,11 @@ from academic_agent.checkpoints import CheckpointStore
 from academic_agent.run_spec import RunSpec
 
 _READ_ONLY_POPEN = subprocess.Popen
+# Upper bound for a scripted thread to reach or be released from its event.
+# Not a performance budget: these requests fsync receipts, and on one Windows
+# CI runner a single request took over 3 s to reach launch (the test ran
+# 9.3 s). A wait that is never satisfied still fails.
+_SCRIPTED_WAIT = 30
 
 
 def request_key():
@@ -121,14 +126,14 @@ def test_pending_duplicate_is_rejected_while_first_popen_is_in_flight(paid_api):
     process = launch.return_value
     def blocked(*_args, **_kwargs):
         started.set()
-        assert release.wait(5)
+        assert release.wait(_SCRIPTED_WAIT)
         return process
     launch.side_effect = blocked
     auth = headers()
     with ThreadPoolExecutor(max_workers=1) as pool:
         first = pool.submit(client.post, "/api/runs", headers=auth, json={"topic": "Concurrent topic"})
         try:
-            assert started.wait(3)
+            assert started.wait(_SCRIPTED_WAIT)
             second = client.post("/api/runs", headers=auth, json={"topic": "Concurrent topic"})
             assert second.status_code == 409
             assert second.headers["x-error-code"] == "paid_receipt_pending"
@@ -136,7 +141,7 @@ def test_pending_duplicate_is_rejected_while_first_popen_is_in_flight(paid_api):
             assert pending["state"] == "pending" and pending["resource_id"]
         finally:
             release.set()
-        accepted = first.result(timeout=5)
+        accepted = first.result(timeout=_SCRIPTED_WAIT)
     assert accepted.status_code == 202
     assert pending["resource_id"] == accepted.json()["run_id"]
     assert launch.call_count == 1 and sum(runs._daily_counts.values()) == 1
@@ -221,7 +226,7 @@ def test_receipted_pdf_cancellation_retains_finished_metadata_but_never_starts_a
     started, release = threading.Event(), threading.Event()
     def extract(*_args, **_kwargs):
         started.set()
-        assert release.wait(4)
+        assert release.wait(_SCRIPTED_WAIT)
         return contribution()
     monkeypatch.setattr(main, "_extract_paper_with_paid_reservation", extract)
     async def exercise():
