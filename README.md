@@ -324,6 +324,7 @@ captures are at [a343a95](https://github.com/shuxiachai/academic-commercializati
 ## Author and more projects
 
 Created by [shuxiachai](https://github.com/shuxiachai).
+Contributor: [Song Guoyu (@7776403yu)](https://github.com/7776403yu).
 Explore [more projects on the author's GitHub profile](https://github.com/shuxiachai).
 
 ## License
