@@ -6,9 +6,9 @@ citations to registered sources and the risks spelled out.
 
 [Open the application](https://academic-commercialization-agent.up.railway.app) · [Read sample reports — no key needed](https://academic-commercialization-agent.up.railway.app/samples) · [Run locally](#quick-start) · [中文](README.zh-CN.md)
 
-![Real historical result screen: CRISPR assessment with score dimensions, source counts and cited risk notes](assets/screenshot-results.png)
+![Current result screen showing a real historical run: CRISPR assessment with its automated-checks panel, score dimensions and source counts](assets/screenshot-results.png)
 
-*Real UI archived on 2026-08-11 at [a343a95](https://github.com/shuxiachai/academic-commercialization-agent/commit/a343a95590ad83f0edec4002e3489355fc96a512), not a current-release capture.*
+*Current interface, captured 2026-10-20, showing a real run from 2026-08-09. That run predates today's automated checks, which the panel states; it is not a current-model result.*
 
 **Try it without keys:** the [sample reports page](https://academic-commercialization-agent.up.railway.app/samples)
 shows three finished assessments and makes no model or search request. The same
@@ -310,13 +310,14 @@ general accuracy score.
 ## Screenshots
 
 <details>
-<summary>Historical home and running views — a343a95, archived 2026-08-11</summary>
+<summary>Home and report views — current interface, captured 2026-10-20</summary>
 
-These are real interface captures from [a343a95](https://github.com/shuxiachai/academic-commercialization-agent/commit/a343a95590ad83f0edec4002e3489355fc96a512).
-Current controls and wording may differ; the result screen is shown above.
+Real historical runs (August 2026) opened in the current interface on a local
+copy; no model or search request was made for these images. The earlier
+captures are at [a343a95](https://github.com/shuxiachai/academic-commercialization-agent/commit/a343a95590ad83f0edec4002e3489355fc96a512).
 
-![Home screen](assets/screenshot-home.png)
-![Analysis in progress](assets/screenshot-running.png)
+![Home screen with real historical runs in the sidebar](assets/screenshot-home.png)
+![Report tab of the same CRISPR run](assets/screenshot-report.png)
 
 </details>
 

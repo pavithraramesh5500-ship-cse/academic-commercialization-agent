@@ -90,8 +90,8 @@ ignore = [
 dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7,<8",
-    # CI runs the suite across the runner's cores (-n auto); 7,500+ short
-    # tests with no dominant one made a single process the bottleneck.
+    # Optional local speed-up (-n auto). CI stays serial until a few
+    # timing-sensitive concurrency tests are parallel-safe.
     "pytest-xdist>=3.6,<4",
 ]
 e2e = [
