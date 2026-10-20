@@ -28,6 +28,12 @@ The Ruff invocation is intentional: CI resolves the latest release, while the
 local pin can disagree. The narrow Pylint set catches specific correctness
 failures; do not replace it with a general style cleanup.
 
+Add `-n auto` (pytest-xdist, in the dev group) to spread the suite over your
+cores, as CI does: the full suite then takes minutes rather than about ten.
+Run it inside the project environment (`uv run`), not with `uv run --with`:
+some tests start a fresh interpreter that may only read the project's own
+installed packages.
+
 - Run the complete suite before editing and after the fix.
 - Do not weaken assertions or add skips to make a failure disappear.
 - Read the actual `UserWarning` before acting. A network-leak warning means
