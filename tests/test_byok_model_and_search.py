@@ -1,7 +1,8 @@
 """BYOK visitors choose their own model and may search with Tavily.
 
-A visitor's run is billed to their own key, so the model is theirs to choose;
-it used to be fixed at each provider's default. The search key was Serper
+A visitor's run is billed to their own key, so the model is theirs to name;
+it used to be fixed at each provider's default, and later fell back to one
+when left empty. There is no default now: the model is part of the set. The search key was Serper
 only, and Serper refuses requests from some hosts, including this
 deployment's, so a Tavily key is accepted as the alternative. Both changes
 must keep the existing boundary: complete credentials or operator billing,
@@ -19,7 +20,7 @@ from unittest import mock
 from pydantic import ValidationError
 
 from academic_agent import llm_config
-from academic_agent.llm_config import DEFAULT_MODELS, MODEL_ENV_NAMES, resolve_provider_config
+from academic_agent.llm_config import MODEL_ENV_NAMES, resolve_provider_config
 from api import papers
 from api.models import ResumeRunRequest, RunRequest
 from api.runs import BYOKCredentials
@@ -48,14 +49,16 @@ class RequestShapeTests(unittest.TestCase):
         for cls in (RunRequest, ResumeRunRequest):
             for search in ({"tavily_api_key": "t"}, {"serper_api_key": "s"}):
                 with self.subTest(cls=cls.__name__, search=search):
-                    req = _request(cls, llm_provider="qwen", llm_api_key="k", **search)
+                    req = _request(cls, llm_provider="qwen", llm_api_key="k",
+                                   llm_model="qwen3.8-27b", **search)
                     self.assertTrue(req.byok)
 
     def test_partial_or_double_search_credentials_are_rejected(self):
         """Never fall back to operator billing, never leave the choice implicit."""
         for fields in (
-            {"llm_provider": "qwen", "llm_api_key": "k"},
-            {"llm_provider": "qwen", "llm_api_key": "k", "serper_api_key": "s", "tavily_api_key": "t"},
+            {"llm_provider": "qwen", "llm_api_key": "k", "llm_model": "m"},
+            {"llm_provider": "qwen", "llm_api_key": "k", "llm_model": "m",
+             "serper_api_key": "s", "tavily_api_key": "t"},
             {"tavily_api_key": "t"},
             {"llm_model": "qwen3.8-max"},
         ):
@@ -72,9 +75,12 @@ class RequestShapeTests(unittest.TestCase):
                 req = _request(llm_provider="qwen", llm_api_key="k", tavily_api_key="t", llm_model=good)
                 self.assertEqual(req.llm_model, good)
 
-    def test_blank_model_means_the_provider_default(self):
-        req = _request(llm_provider="qwen", llm_api_key="k", tavily_api_key="t", llm_model="   ")
-        self.assertIsNone(req.llm_model)
+    def test_a_missing_or_blank_model_is_rejected_not_defaulted(self):
+        """No built-in model: the visitor's key is billed only for one they named."""
+        for model in ({}, {"llm_model": ""}, {"llm_model": "   "}):
+            for cls in (RunRequest, ResumeRunRequest):
+                with self.subTest(cls=cls.__name__, model=model), self.assertRaises(ValidationError):
+                    _request(cls, llm_provider="qwen", llm_api_key="k", tavily_api_key="t", **model)
 
     def test_operator_billed_request_is_unchanged(self):
         req = _request()
@@ -96,11 +102,13 @@ class SubprocessEnvironmentTests(unittest.TestCase):
                 self.assertNotIn("qwen3.8-max", env.values())
                 self.assertNotIn("https://operator.invalid/v1", env.values())
 
-    def test_no_model_leaves_the_provider_default(self):
+    def test_a_worker_without_a_model_fails_closed(self):
+        """Defence in depth behind the API check: no operator model, no default."""
         env = BYOKCredentials("qwen", "guest-key", tavily_api_key="t").as_env(_OPERATOR_ENV)
         self.assertEqual(env["QWEN_MODEL"], "")
         with mock.patch.dict(os.environ, env, clear=True):
-            self.assertEqual(resolve_provider_config().model, DEFAULT_MODELS["qwen"])
+            with self.assertRaisesRegex(RuntimeError, "No model configured for qwen"):
+                resolve_provider_config()
 
     def test_worker_resolves_the_visitors_model_at_the_official_endpoint(self):
         env = BYOKCredentials("qwen", "guest-key", tavily_api_key="t",
@@ -155,6 +163,11 @@ class ExplicitResolutionTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             resolve_provider_config(provider="qwen", api_key="guest", model="http://evil.invalid")
 
+    def test_explicit_credentials_without_a_model_are_rejected(self):
+        with mock.patch.dict(os.environ, _OPERATOR_ENV, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "model must be named"):
+                resolve_provider_config(provider="qwen", api_key="guest")
+
     def test_create_llm_passes_the_model_through(self):
         captured: dict = {}
         with mock.patch.dict(os.environ, _OPERATOR_ENV, clear=True), \
@@ -205,6 +218,11 @@ class PaperUploadModelTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 422)
                 self.assertEqual(seen, {})
 
-    def test_an_empty_model_field_uses_the_default(self):
-        _response, seen = self._post(llm_provider="qwen", llm_api_key="guest", llm_model="")
-        self.assertIsNone(seen.get("llm_model"))
+    def test_a_missing_or_empty_model_field_is_rejected(self):
+        for form in ({"llm_provider": "qwen", "llm_api_key": "guest", "llm_model": ""},
+                     {"llm_provider": "qwen", "llm_api_key": "guest"}):
+            with self.subTest(form=form):
+                response, seen = self._post(**form)
+                self.assertEqual(response.status_code, 422)
+                self.assertIn("llm_model is required", response.text)
+                self.assertEqual(seen, {})

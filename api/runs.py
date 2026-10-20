@@ -202,7 +202,9 @@ class BYOKCredentials:
     llm_provider: str
     llm_api_key: str
     serper_api_key: str | None = None
-    #: The model for the visitor's own key; the provider default when None.
+    #: The model for the visitor's own key. The API boundary requires it
+    #: (api/models.py); without it the worker has no model to resolve and
+    #: fails before any request, since there is no default.
     llm_model: str | None = None
     #: Tavily is offered because Serper refuses requests from some hosts,
     #: including this deployment's. Exactly one search key is required.

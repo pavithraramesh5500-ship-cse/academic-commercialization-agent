@@ -1531,14 +1531,20 @@ async def upload_paper(
             detail=f"llm_provider must be one of {BYOK_PROVIDERS}.",
         )
     # Extraction never searches, so no search key is involved here; the model
-    # only applies to the visitor's own key. Direct (non-HTTP) callers receive
-    # the Form() default object rather than None, and an empty form field
-    # means "provider default", so only a non-empty string names a model.
+    # only applies to the visitor's own key, and is required with it: there is
+    # no default. Direct (non-HTTP) callers receive the Form() default object
+    # rather than None, and an empty form field names no model, so only a
+    # non-empty string counts.
     llm_model = (llm_model.strip() or None) if isinstance(llm_model, str) else None
     if llm_model is not None and (not llm_provider or not BYOK_MODEL_PATTERN.fullmatch(llm_model)):
         raise HTTPException(
             status_code=422,
             detail="llm_model requires llm_provider and must be a plain model identifier.",
+        )
+    if llm_provider and llm_model is None:
+        raise HTTPException(
+            status_code=422,
+            detail="llm_model is required with llm_provider: there is no default model.",
         )
     byok = bool(llm_provider)
     matched = access.matching_code(http_request.headers.get("x-access-code"))

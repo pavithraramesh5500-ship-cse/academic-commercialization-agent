@@ -19,14 +19,14 @@ RunState = Literal["running", "completed", "failed", "cancelled", "timeout",
 BYOK_PROVIDERS = ("deepseek", "qwen", "openai", "anthropic")
 
 _BYOK_SHAPE = (
-    "llm_provider and llm_api_key, plus exactly one of tavily_api_key or "
-    "serper_api_key, must be provided together (llm_model optional), or all "
+    "llm_provider, llm_api_key and llm_model, plus exactly one of "
+    "tavily_api_key or serper_api_key, must be provided together, or all "
     "omitted to use the deployment's own keys."
 )
 
 
-def _blank_model_is_default(value: object) -> object:
-    """An empty model field means "the provider's default", not a bad name."""
+def _blank_model_is_missing(value: object) -> object:
+    """An empty model field is a missing model, not a bad name."""
     if isinstance(value, str) and not value.strip():
         return None
     return value.strip() if isinstance(value, str) else value
@@ -39,12 +39,13 @@ def _check_byok(provider, llm_key, serper_key, tavily_key, model) -> None:
     of a complete set is rejected. Exactly one search key: either service
     serves the run, and accepting both would leave the choice implicit.
     Tavily is offered because Serper refuses requests from some hosting
-    providers, including the deployment's. A model is only meaningful for
-    the visitor's own key, so it requires a provider.
+    providers, including the deployment's. The model is part of the set:
+    there is no built-in default, so the visitor's key is only ever billed
+    for a model the visitor named.
     """
     search_keys = [k for k in (serper_key, tavily_key) if k]
     if any((provider, llm_key, serper_key, tavily_key, model)):
-        if not (provider and llm_key and len(search_keys) == 1):
+        if not (provider and llm_key and model and len(search_keys) == 1):
             raise ValueError(_BYOK_SHAPE)
     if provider is not None and provider not in BYOK_PROVIDERS:
         raise ValueError(f"llm_provider must be one of {BYOK_PROVIDERS}.")
@@ -89,7 +90,8 @@ class RunRequest(BaseModel):
     llm_api_key: str | None = Field(default=None, description="Bring-your-own LLM API key.")
     llm_model: str | None = Field(
         default=None,
-        description="Model for the bring-your-own LLM key; the provider's default when omitted.",
+        description="Model for the bring-your-own LLM key. Required with llm_provider; "
+                    "there is no default.",
     )
     tavily_api_key: str | None = Field(default=None, description="Bring-your-own Tavily API key.")
     serper_api_key: str | None = Field(default=None, description="Bring-your-own Serper API key.")
@@ -108,7 +110,7 @@ class RunRequest(BaseModel):
         return value.strip() if isinstance(value, str) else value
 
     _model_blank = field_validator("llm_model", mode="before")(classmethod(
-        lambda cls, value: _blank_model_is_default(value)))
+        lambda cls, value: _blank_model_is_missing(value)))
 
     @model_validator(mode="after")
     def _byok_is_all_or_nothing(self) -> "RunRequest":
@@ -137,14 +139,15 @@ class ResumeRunRequest(BaseModel):
     llm_api_key: str | None = Field(default=None, description="Fresh LLM API key.")
     llm_model: str | None = Field(
         default=None,
-        description="Model for the fresh LLM key. A different model from the source run "
-                    "re-executes its nodes: checkpoint identity binds the model.",
+        description="Model for the fresh LLM key; required with llm_provider. A different "
+                    "model from the source run re-executes its nodes: checkpoint identity "
+                    "binds the model.",
     )
     tavily_api_key: str | None = Field(default=None, description="Fresh Tavily API key.")
     serper_api_key: str | None = Field(default=None, description="Fresh Serper API key.")
 
     _model_blank = field_validator("llm_model", mode="before")(classmethod(
-        lambda cls, value: _blank_model_is_default(value)))
+        lambda cls, value: _blank_model_is_missing(value)))
 
     @model_validator(mode="after")
     def _byok_is_all_or_nothing(self) -> "ResumeRunRequest":

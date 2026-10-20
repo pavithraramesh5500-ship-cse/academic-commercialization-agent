@@ -196,8 +196,14 @@ class RunRequestByokValidationTests(unittest.TestCase):
 
     def test_providing_all_three_is_valid(self):
         req = RunRequest(topic="a valid research topic", llm_provider="deepseek",
-                          llm_api_key="k", serper_api_key="s")
+                          llm_api_key="k", llm_model="deepseek-chat", serper_api_key="s")
         self.assertTrue(req.byok)
+
+    def test_byok_without_a_model_is_rejected(self):
+        """There is no default model to bill the visitor's key for."""
+        with self.assertRaises(ValidationError):
+            RunRequest(topic="a valid research topic", llm_provider="deepseek",
+                       llm_api_key="k", serper_api_key="s")
 
     def test_partial_byok_is_rejected(self):
         with self.assertRaises(ValidationError):
@@ -516,7 +522,7 @@ class PaperPaidBoundaryTests(_RunLifecycleTestBase):
     def _upload(self, *, code: str | None = None, byok: bool = False):
         headers = {"X-Access-Code": code} if code else {}
         data = (
-            {"llm_provider": "deepseek", "llm_api_key": "visitor-key"}
+            {"llm_provider": "deepseek", "llm_api_key": "visitor-key", "llm_model": "deepseek-chat"}
             if byok else {}
         )
         return self.client.post(
@@ -662,6 +668,7 @@ class PaperPaidBoundaryTests(_RunLifecycleTestBase):
                     file=upload,
                     llm_provider="deepseek",
                     llm_api_key="visitor-key",
+                    llm_model="deepseek-chat",
                 )
             )
             try:
@@ -735,6 +742,7 @@ class BYOKSubmissionTests(_RunLifecycleTestBase):
             "topic": "a valid research topic",
             "llm_provider": "deepseek",
             "llm_api_key": "visitors-llm-key",
+            "llm_model": "deepseek-chat",
             "serper_api_key": "visitors-serper-key",
         }
         body.update(overrides)
@@ -1059,6 +1067,7 @@ class MultiCodeIsolationTests(_RunLifecycleTestBase):
                 "topic": "byok topic",
                 "llm_provider": "deepseek",
                 "llm_api_key": "k",
+                "llm_model": "deepseek-chat",
                 "serper_api_key": "s",
             })
             alice_view = self.client.get(

@@ -337,10 +337,10 @@
       </select>
       <input class="gate__input" id="byok-llm-key" type="password" autocomplete="off"
              data-i18n-placeholder="byok_llm_placeholder" placeholder="LLM API key">
-      <!-- The model the visitor's own key should use. Empty means the
-           provider's default, which byok_fields.js shows as the placeholder. -->
+      <!-- The model the visitor's own key should use. Required: there is no
+           default model. byok_fields.js shows an example as the placeholder. -->
       <input class="gate__input" id="byok-model" type="text" autocomplete="off" spellcheck="false"
-             maxlength="100" placeholder="Model (optional)">
+             maxlength="100" required placeholder="Model (required)">
       <!-- Tavily first: Serper refuses requests from some hosting providers,
            including this deployment's, so a Serper-only run may find nothing. -->
       <select class="gate__input" id="byok-search" aria-label="Web search service">
