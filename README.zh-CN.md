@@ -5,9 +5,9 @@
 
 [打开在线应用](https://academic-commercialization-agent.up.railway.app) · [免 Key 阅读示例报告](https://academic-commercialization-agent.up.railway.app/samples) · [本地运行](#快速启动) · [English](README.md)
 
-![真实历史结果界面：CRISPR 评估的评分维度、来源数量及带引用的风险说明](assets/screenshot-results.png)
+![当前结果界面中的一次真实历史运行：CRISPR 评估的自动检查面板、评分维度与来源数量](assets/screenshot-results.png)
 
-*真实界面归档于 2026-08-11，版本 [a343a95](https://github.com/shuxiachai/academic-commercialization-agent/commit/a343a95590ad83f0edec4002e3489355fc96a512)，不是当前发布版的新截图。*
+*当前界面，2026-10-20 截取，展示的是 2026-08-09 的一次真实运行。该运行早于现在的自动检查，面板对此有说明；不代表当前模型的结果。*
 
 **无需 Key 先体验：**[示例报告页](https://academic-commercialization-agent.up.railway.app/samples)
 提供三份完整评估，打开时不发起任何模型或检索请求。同样的报告也在
@@ -263,13 +263,13 @@ Kubernetes 本身不能解决这些缺口。
 ## 界面截图
 
 <details>
-<summary>历史首页与运行中界面 — a343a95，2026-08-11 归档</summary>
+<summary>首页与报告界面 — 当前界面，2026-10-20 截取</summary>
 
-下图为版本 [a343a95](https://github.com/shuxiachai/academic-commercialization-agent/commit/a343a95590ad83f0edec4002e3489355fc96a512)
-的真实界面，当前控件和文案可能不同；结果截图已放在首屏。
+在本地副本中用当前界面打开 2026 年 8 月的真实历史运行截取，截图过程未发起任何模型或检索请求。
+旧版截图见版本 [a343a95](https://github.com/shuxiachai/academic-commercialization-agent/commit/a343a95590ad83f0edec4002e3489355fc96a512)。
 
-![首页](assets/screenshot-home.png)
-![分析运行中](assets/screenshot-running.png)
+![首页，侧栏为真实历史运行](assets/screenshot-home.png)
+![同一次 CRISPR 运行的报告页](assets/screenshot-report.png)
 
 </details>
 
