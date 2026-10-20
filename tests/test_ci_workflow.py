@@ -15,11 +15,15 @@ _PYTHON = "${{ matrix.python-version }}"
 _PLAIN_IF = "matrix.os != 'ubuntu-latest' || matrix.python-version != '3.12'"
 _COVERAGE_IF = "matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'"
 # Serial until the timing-sensitive concurrency tests are parallel-safe.
-_PLAIN_RUN = f"uv run --python {_PYTHON} pytest tests/ -v --tb=short --durations=40"
+_FULL_RUN = f"uv run --python {_PYTHON} pytest tests/ -v --tb=short --durations=40"
+# Non-coverage PR cells skip tests of closed experiments; the coverage cell
+# and the weekly full-suite workflow run everything.
+_PLAIN_RUN = f'uv run --python {_PYTHON} pytest tests/ -m "not experiment" -v --tb=short --durations=40'
 _COVERAGE_RUN = (
-    f"{_PLAIN_RUN} --cov=src/academic_agent --cov=api --cov=ui "
+    f"{_FULL_RUN} --cov=src/academic_agent --cov=api --cov=ui "
     "--cov-report=term-missing --cov-fail-under=85"
 )
+_WEEKLY = _WORKFLOW.with_name("full-suite.yml")
 # The coverage cell measures with sys.monitoring; the floor and scope above
 # are unchanged, only the measurement overhead is.
 _COVERAGE_ENV = {"COVERAGE_CORE": "sysmon"}
@@ -208,6 +212,9 @@ def test_ci_executable_contracts():
     (_COVERAGE_RUN, {"continue-on-error": True}),
     (_COVERAGE_RUN, {"env": {"COVERAGE_CORE": "ctrace"}}),
     (_PLAIN_RUN, {"env": _COVERAGE_ENV}),
+    # The coverage cell is the only per-PR run of the experiment tests.
+    (_COVERAGE_RUN, {"run": _COVERAGE_RUN.replace("tests/ ", 'tests/ -m "not experiment" ')}),
+    (_PLAIN_RUN, {"run": _PLAIN_RUN.replace("not experiment", "not experiment and not slow")}),
 ])
 def test_execution_contract_rejects_weakened_steps(command, update):
     """Reject execution/timing bypasses in memory, not by corrupting CI on disk."""
@@ -281,6 +288,52 @@ def test_action_contract_rejects_unreviewed_refs(ref):
     jobs["test"]["steps"].append({"uses": ref})
     with pytest.raises(AssertionError):
         _assert_actions(jobs)
+
+
+def _assert_weekly(workflow):
+    triggers = workflow.get("on", workflow.get(True))  # YAML 1.1 reads a bare `on` as True
+    assert triggers["schedule"] and "workflow_dispatch" in triggers
+    (job,) = workflow["jobs"].values()
+    _unconditional(job)
+    assert job["runs-on"] == "${{ matrix.os }}"
+    assert job["strategy"]["fail-fast"] is False
+    matrix = job["strategy"]["matrix"]
+    assert sorted(matrix["os"]) == ["ubuntu-latest", "windows-latest"]
+    assert sorted(matrix["python-version"]) == ["3.11", "3.12"]
+    steps = job["steps"]
+    assert {step["uses"] for step in steps if "uses" in step} == {
+        f"{action}@{_REVIEWED_NODE24_REFS[action]}" for action in ("actions/checkout", "astral-sh/setup-uv")
+    }
+    sync = _run_index(steps, f"uv sync --python {_PYTHON}")
+    node = _run_index(steps, "node --version")
+    suite = _run_index(steps, _FULL_RUN)
+    assert sync < node < suite
+    for index in (sync, node, suite):
+        _unconditional(steps[index])
+    assert sum("pytest" in _tokens(step.get("run", "")) for step in steps) == 1
+
+
+def test_weekly_workflow_runs_the_complete_suite_on_every_cell():
+    """The only place experiment tests run on Windows and Python 3.11."""
+    _assert_weekly(yaml.safe_load(_WEEKLY.read_text(encoding="utf-8")))
+
+
+@pytest.mark.parametrize("defect", ["filtered", "no-schedule", "one-cell", "skipped"])
+def test_weekly_contract_rejects_a_partial_suite(defect):
+    workflow = yaml.safe_load(_WEEKLY.read_text(encoding="utf-8"))
+    triggers = workflow.get("on", workflow.get(True))
+    (job,) = workflow["jobs"].values()
+    suite = _run_index(job["steps"], _FULL_RUN)
+    if defect == "filtered":
+        job["steps"][suite]["run"] = _PLAIN_RUN
+    elif defect == "no-schedule":
+        triggers.pop("schedule")
+    elif defect == "one-cell":
+        job["strategy"]["matrix"]["os"] = ["ubuntu-latest"]
+    else:
+        job["steps"][suite]["if"] = "false"
+    with pytest.raises((AssertionError, KeyError)):
+        _assert_weekly(workflow)
 
 
 def test_contracts_ignore_step_labels_comments_and_job_order():
