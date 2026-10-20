@@ -46,6 +46,12 @@ Use the documented FastAPI or CLI commands, not an arbitrary root-level script.
 The remaining experimental runners can bind their paths and source hashes.
 Their migration requires a separate identity and compatibility review.
 
+Do not add new scripts at the root. Put a new experiment runner, probe or
+audit under `scripts/` (offline audits in `scripts/audits/`, run as
+`uv run python -m scripts.audits.<name>`) and its tests in `tests/`.
+`market_retrieval_probe.py` (2026-10-19) is the last root-level addition; it
+stays where its dated result cites it.
+
 ## Relocated maintenance and demo commands
 
 Eleven root scripts now live under `scripts/`. There are no forwarding files at
