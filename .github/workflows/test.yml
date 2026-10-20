@@ -47,7 +47,9 @@ jobs:
         # on both shells — see the filterwarnings comment there.
         # Both paths report slow test phases without changing collection or
         # the coverage measurement core; timings alone do not explain a cause.
-        run: uv run --python ${{ matrix.python-version }} pytest tests/ -v --tb=short --durations=40
+        # -n auto spreads the suite over the runner's cores (pytest-xdist):
+        # no single test dominates, so one process was the bottleneck.
+        run: uv run --python ${{ matrix.python-version }} pytest tests/ -n auto -v --tb=short --durations=40
 
       - name: Run tests with the measured coverage floor
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -55,8 +57,13 @@ jobs:
         # A fresh full run measured 87% on 2026-08-24; the unchanged 85% floor
         # leaves room for platform-specific defensive branches. Other cells
         # still run every test, without redefining this single-platform metric.
+        # sys.monitoring (Python 3.12+) measures the same line coverage as the
+        # trace-function core at a fraction of its overhead; pytest-cov
+        # combines the per-worker data from -n auto.
+        env:
+          COVERAGE_CORE: sysmon
         run: >
-          uv run --python ${{ matrix.python-version }} pytest tests/ -v --tb=short --durations=40
+          uv run --python ${{ matrix.python-version }} pytest tests/ -n auto -v --tb=short --durations=40
           --cov=src/academic_agent
           --cov=api
           --cov=ui

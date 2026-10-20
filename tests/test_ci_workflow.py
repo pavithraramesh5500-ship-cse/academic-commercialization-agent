@@ -14,11 +14,15 @@ _WORKFLOW = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "tes
 _PYTHON = "${{ matrix.python-version }}"
 _PLAIN_IF = "matrix.os != 'ubuntu-latest' || matrix.python-version != '3.12'"
 _COVERAGE_IF = "matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'"
-_PLAIN_RUN = f"uv run --python {_PYTHON} pytest tests/ -v --tb=short --durations=40"
+# -n auto runs the same complete suite across the runner's cores (pytest-xdist).
+_PLAIN_RUN = f"uv run --python {_PYTHON} pytest tests/ -n auto -v --tb=short --durations=40"
 _COVERAGE_RUN = (
     f"{_PLAIN_RUN} --cov=src/academic_agent --cov=api --cov=ui "
     "--cov-report=term-missing --cov-fail-under=85"
 )
+# The coverage cell measures with sys.monitoring; the floor and scope above
+# are unchanged, only the measurement overhead is.
+_COVERAGE_ENV = {"COVERAGE_CORE": "sysmon"}
 _CELLS = set(product(("ubuntu-latest", "windows-latest"), ("3.11", "3.12")))
 _CANONICAL = {("ubuntu-latest", "3.12")}
 # These are the only admitted conditional forms, not an Actions interpreter.
@@ -120,6 +124,7 @@ def _assert_test_execution(jobs):
                 continue
             assert owner == "test", "No extra full-suite job alongside the matrix"
             assert command in (_tokens(_PLAIN_RUN), _tokens(_COVERAGE_RUN))
+            assert step.get("env") == (_COVERAGE_ENV if command == _tokens(_COVERAGE_RUN) else None)
             assert step.get("continue-on-error", False) is False
             condition = _condition(step.get("if"))
             assert condition in _CONDITION_CELLS
@@ -201,6 +206,8 @@ def test_ci_executable_contracts():
     (_PLAIN_RUN, {"run": _PLAIN_RUN + " || true"}),
     (_PLAIN_RUN, {"run": _PLAIN_RUN + " -k smoke"}),
     (_COVERAGE_RUN, {"continue-on-error": True}),
+    (_COVERAGE_RUN, {"env": {"COVERAGE_CORE": "ctrace"}}),
+    (_PLAIN_RUN, {"env": _COVERAGE_ENV}),
 ])
 def test_execution_contract_rejects_weakened_steps(command, update):
     """Reject execution/timing bypasses in memory, not by corrupting CI on disk."""
